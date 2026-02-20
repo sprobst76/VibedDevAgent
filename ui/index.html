@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevAgent Dashboard</title>
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --panel: #ffffff;
+      --ink: #122026;
+      --accent: #0a7f5a;
+      --muted: #627178;
+      --line: #dde5e8;
+    }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #dbeee8, var(--bg) 45%);
+      color: var(--ink);
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 40px auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(18, 32, 38, 0.08);
+      overflow: hidden;
+    }
+    header {
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.3rem;
+      letter-spacing: 0.02em;
+    }
+    .hint {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 0.92rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      text-align: left;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.94rem;
+    }
+    th {
+      background: #f9fbfc;
+      color: #3f4e54;
+      font-weight: 600;
+    }
+    .badge {
+      display: inline-block;
+      background: #e8f7f1;
+      color: var(--accent);
+      border: 1px solid #bce7d8;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>DevAgent Jobs (Read-only)</h1>
+      <div class="hint">Datenquelle: <code>ui/jobs.json</code></div>
+    </header>
+    <table>
+      <thead>
+        <tr>
+          <th>Job</th>
+          <th>Status</th>
+          <th>Last Action</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody id="jobs"></tbody>
+    </table>
+  </div>
+
+  <script>
+    fetch("jobs.json")
+      .then((response) => response.json())
+      .then((data) => {
+        const tbody = document.getElementById("jobs");
+        const jobs = data.jobs || [];
+        for (const job of jobs) {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${job.job_id || "-"}</td>
+            <td><span class="badge">${job.state || "UNKNOWN"}</span></td>
+            <td>${job.last_action || "-"}</td>
+            <td>${job.timestamp || "-"}</td>
+          `;
+          tbody.appendChild(row);
+        }
+      })
+      .catch(() => {
+        const tbody = document.getElementById("jobs");
+        const row = document.createElement("tr");
+        row.innerHTML = `<td colspan="4">Keine Daten gefunden (ui/jobs.json).</td>`;
+        tbody.appendChild(row);
+      });
+  </script>
+</body>
+</html>

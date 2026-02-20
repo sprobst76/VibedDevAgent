@@ -1,0 +1,19 @@
+[Unit]
+Description=DevAgent Core Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=devagent
+WorkingDirectory=/srv/devagent
+EnvironmentFile=/srv/devagent/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/env bash -lc 'python3 -m core.matrix_worker'
+Restart=on-failure
+RestartSec=3
+StandardOutput=append:/var/log/devagent/core.log
+StandardError=append:/var/log/devagent/core.log
+
+[Install]
+WantedBy=multi-user.target

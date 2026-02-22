@@ -1,0 +1,147 @@
+<div class="border-t border-slate-100 pt-3 mt-1 space-y-3">
+
+  <form hx-post="/projects/{{ name }}/init-room"
+        hx-target="#project-list"
+        hx-swap="innerHTML"
+        hx-disabled-elt="find button[type='submit']"
+        class="space-y-3">
+
+    <!-- Room action radio -->
+    <div class="flex gap-3 text-xs flex-wrap">
+      <label class="flex items-center gap-1.5 cursor-pointer">
+        <input type="radio" name="room_action" value="existing" checked
+               onchange="showRoomFormPanel_{{ name|replace('-','_') }}(this.value)"
+               class="text-blue-600 focus:ring-blue-500">
+        <span class="text-slate-600">Bestehenden verknüpfen</span>
+      </label>
+      <label class="flex items-center gap-1.5 cursor-pointer">
+        <input type="radio" name="room_action" value="new"
+               onchange="showRoomFormPanel_{{ name|replace('-','_') }}(this.value)"
+               class="text-blue-600 focus:ring-blue-500">
+        <span class="text-slate-600">Neuen erstellen</span>
+      </label>
+    </div>
+
+    <!-- Panel: existing -->
+    <div id="rfp_existing_{{ name }}" class="space-y-2">
+
+      <!-- Search (needs valid token) -->
+      <div class="flex gap-2">
+        <input type="text" id="rf_search_{{ name }}"
+               placeholder="Raum suchen…"
+               oninput="rfFilter_{{ name|replace('-','_') }}(this.value)"
+               class="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button type="button"
+                onclick="rfLoad_{{ name|replace('-','_') }}()"
+                class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-2.5 py-1.5 transition-colors">
+          Suchen
+        </button>
+      </div>
+      <div id="rf_list_{{ name }}"
+           class="max-h-40 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-100 text-xs hidden">
+      </div>
+      <p id="rf_selected_{{ name }}" class="text-xs text-blue-700 hidden"></p>
+      <p id="rf_error_{{ name }}" class="text-xs text-red-500 hidden"></p>
+
+      <!-- Divider -->
+      <div class="flex items-center gap-2 text-xs text-slate-400">
+        <div class="flex-1 border-t border-slate-100"></div>
+        <span>oder direkt eingeben</span>
+        <div class="flex-1 border-t border-slate-100"></div>
+      </div>
+
+      <!-- Direct room ID input (no token needed) -->
+      <input type="text" name="existing_room_id" id="rf_room_id_{{ name }}"
+             placeholder="!roomid:matrix.org"
+             class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+      <input type="text" name="room_name" id="rf_room_name_{{ name }}"
+             placeholder="Raum-Anzeigename (optional)"
+             class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <!-- Panel: new -->
+    <div id="rfp_new_{{ name }}" class="hidden space-y-1">
+      <input type="text" name="room_name"
+             placeholder="DevAgent · {{ name }}"
+             class="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <div class="flex gap-2">
+      <button type="submit"
+              class="flex-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors font-medium">
+        Speichern
+      </button>
+      <button type="button"
+              onclick="document.getElementById('room-form-{{ name }}').innerHTML=''"
+              class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-1.5 transition-colors">
+        Abbrechen
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+  const n = {{ name|tojson }};
+  const safe = n.replace(/-/g, '_');
+  let _rooms = [];
+
+  window['showRoomFormPanel_' + safe] = function(action) {
+    document.getElementById('rfp_existing_' + n).classList.toggle('hidden', action !== 'existing');
+    document.getElementById('rfp_new_' + n).classList.toggle('hidden', action !== 'new');
+  };
+
+  window['rfLoad_' + safe] = async function() {
+    const list = document.getElementById('rf_list_' + n);
+    const err  = document.getElementById('rf_error_' + n);
+    list.innerHTML = '<div class="px-3 py-2 text-slate-400">Wird geladen…</div>';
+    list.classList.remove('hidden');
+    err.classList.add('hidden');
+    try {
+      const resp = await fetch('/api/matrix/rooms');
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || resp.statusText);
+      _rooms = data;
+      rfRender(n, _rooms);
+    } catch(e) {
+      list.classList.add('hidden');
+      err.textContent = 'Suche nicht verfügbar: ' + e.message + ' — Bitte Room-ID direkt eingeben.';
+      err.classList.remove('hidden');
+    }
+  };
+
+  window['rfFilter_' + safe] = function(q) {
+    if (!_rooms.length) { window['rfLoad_' + safe](); return; }
+    const filtered = q
+      ? _rooms.filter(r => r.name.toLowerCase().includes(q.toLowerCase()) || r.id.includes(q))
+      : _rooms;
+    rfRender(n, filtered);
+    document.getElementById('rf_list_' + n).classList.remove('hidden');
+  };
+
+  function rfRender(name, rooms) {
+    const list = document.getElementById('rf_list_' + name);
+    if (!rooms.length) {
+      list.innerHTML = '<div class="px-3 py-2 text-slate-400">Keine Räume gefunden</div>';
+      return;
+    }
+    list.innerHTML = rooms.map(r =>
+      '<button type="button" onclick="rfSelect_' + safe + '(\'' + r.id + '\',\'' + r.name.replace(/'/g,"\\'") + '\')" ' +
+      'class="w-full text-left px-3 py-1.5 hover:bg-blue-50 transition-colors">' +
+      '<span class="font-medium">' + (r.name || r.id) + '</span>' +
+      '<span class="block font-mono text-slate-400 text-xs">' + r.id + '</span>' +
+      '</button>'
+    ).join('');
+  }
+
+  window['rfSelect_' + safe] = function(id, roomName) {
+    document.getElementById('rf_room_id_' + n).value   = id;
+    document.getElementById('rf_room_name_' + n).value = roomName;
+    const lbl = document.getElementById('rf_selected_' + n);
+    lbl.textContent = '✓ ' + (roomName || id);
+    lbl.classList.remove('hidden');
+    document.getElementById('rf_list_' + n).classList.add('hidden');
+    document.getElementById('rf_search_' + n).value = roomName || id;
+  };
+})();
+</script>

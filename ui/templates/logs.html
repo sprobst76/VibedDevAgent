@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}DevAgent — Live Log{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Live Log</h1>
+      <p class="text-xs text-slate-400 font-mono mt-1">{{ log_file }}</p>
+    </div>
+    <div class="flex gap-2 items-center">
+      <span id="sse-status" class="text-xs text-slate-400">Verbinde…</span>
+      <button onclick="document.getElementById('log-output').textContent = ''"
+              class="text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+        Leeren
+      </button>
+      <button id="scroll-toggle" onclick="toggleAutoScroll()"
+              class="text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+        Auto-Scroll: Ein
+      </button>
+    </div>
+  </div>
+
+  <pre id="log-output"
+       class="bg-slate-900 text-emerald-300 text-xs font-mono p-4 rounded-lg h-[72vh] overflow-auto whitespace-pre-wrap break-words"></pre>
+
+</div>
+
+<script>
+  const pre    = document.getElementById('log-output');
+  const status = document.getElementById('sse-status');
+  const btn    = document.getElementById('scroll-toggle');
+  let autoScroll = true;
+
+  function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    btn.textContent = 'Auto-Scroll: ' + (autoScroll ? 'Ein' : 'Aus');
+  }
+
+  function appendLine(text) {
+    pre.textContent += text + '\n';
+    if (autoScroll) pre.scrollTop = pre.scrollHeight;
+  }
+
+  const es = new EventSource('/api/logs/stream');
+
+  es.onopen = function () {
+    status.textContent = '● Verbunden';
+    status.className = 'text-xs text-emerald-500';
+  };
+
+  es.onmessage = function (e) {
+    appendLine(e.data);
+  };
+
+  es.onerror = function () {
+    status.textContent = '○ Getrennt — reconnecting…';
+    status.className = 'text-xs text-red-400';
+  };
+</script>
+{% endblock %}

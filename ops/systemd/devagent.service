@@ -5,10 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=devagent
+# TEMPORARY: running as spro for claude CLI access (Option A).
+# TODO: switch back to devagent once Option C is implemented (see TODO.md #14).
+User=spro
 WorkingDirectory=/srv/devagent
 EnvironmentFile=/srv/devagent/.env
 Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/spro/.local/bin:/home/spro/.nvm/versions/node/v24.11.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/env bash -lc 'python3 -m core.matrix_worker'
 Restart=on-failure
 RestartSec=3

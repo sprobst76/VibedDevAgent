@@ -1,0 +1,33 @@
+<div class="space-y-2">
+
+  <div class="flex items-center justify-between">
+    <span class="text-xs font-mono text-slate-500">
+      {{ name }}/CLAUDE.md
+      {% if not exists %}<span class="text-amber-500 ml-1">(noch nicht vorhanden)</span>{% endif %}
+    </span>
+    <button type="button"
+            onclick="document.getElementById('claude-md-wrap-{{ name }}').classList.toggle('hidden')"
+            class="text-xs text-slate-400 hover:text-slate-600">einklappen</button>
+  </div>
+
+  <div id="claude-md-wrap-{{ name }}">
+    <form hx-post="/projects/{{ name }}/claude-md"
+          hx-target="#claude-md-status-{{ name }}"
+          hx-swap="innerHTML"
+          class="space-y-2">
+      <textarea name="content"
+                rows="14"
+                class="w-full text-xs font-mono border border-slate-200 rounded-lg px-3 py-2
+                       focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y bg-slate-50"
+      >{{ content }}</textarea>
+      <div class="flex items-center gap-3">
+        <button type="submit"
+                class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium">
+          Speichern
+        </button>
+        <span id="claude-md-status-{{ name }}" class="text-xs"></span>
+      </div>
+    </form>
+  </div>
+
+</div>

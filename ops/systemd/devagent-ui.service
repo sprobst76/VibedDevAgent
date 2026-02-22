@@ -1,0 +1,21 @@
+[Unit]
+Description=DevAgent Web UI
+After=network-online.target devagent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=spro
+WorkingDirectory=/srv/devagent
+EnvironmentFile=/srv/devagent/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=DEVAGENT_DEVELOPMENT_ROOT=/home/spro/development
+Environment=DEVAGENT_PROJECTS_FILE=/srv/devagent/state/projects.json
+ExecStart=/home/spro/development/VibedDevAgent/.venv/bin/uvicorn ui.server:app --host 0.0.0.0 --port 20042 --app-dir /home/spro/development/VibedDevAgent
+Restart=on-failure
+RestartSec=3
+StandardOutput=append:/var/log/devagent/ui.log
+StandardError=append:/var/log/devagent/ui.log
+
+[Install]
+WantedBy=multi-user.target

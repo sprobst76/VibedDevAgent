@@ -41,6 +41,7 @@ def main() -> None:
         "name": _safe_state(client, room_id, "m.room.name"),
         "topic": _safe_state(client, room_id, "m.room.topic"),
         "canonical_alias": _safe_state(client, room_id, "m.room.canonical_alias"),
+        "encryption": _safe_state(client, room_id, "m.room.encryption"),
     }
     print(json.dumps(out, indent=2, ensure_ascii=False))
 

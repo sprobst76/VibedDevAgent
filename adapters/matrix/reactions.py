@@ -25,7 +25,9 @@ class ReactionDecision:
 
 def map_reaction_to_event(reaction: str) -> JobEvent | None:
     """Translate matrix emoji reaction into a job event."""
-    return EMOJI_TO_EVENT.get(reaction)
+    # Strip variation selectors (e.g. U+FE0F) that Element appends to emoji
+    normalized = reaction.replace("\ufe0f", "").strip()
+    return EMOJI_TO_EVENT.get(normalized)
 
 
 def evaluate_reaction(

@@ -1,0 +1,22 @@
+{% if flash %}
+  <div class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2 mb-3">
+    {{ flash }}
+  </div>
+{% endif %}
+{% if errors %}
+  <div class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-2 mb-3 space-y-1">
+    {% for e in errors %}<div>{{ e }}</div>{% endfor %}
+  </div>
+{% endif %}
+
+{% if projects %}
+  {% for p in projects %}
+    {% include "partials/project_card.html" %}
+  {% endfor %}
+{% else %}
+  <div class="text-center py-16 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+    <div class="text-4xl mb-3">📁</div>
+    <p class="font-medium text-slate-500">Noch keine Projekte</p>
+    <p class="text-sm mt-1">Füge ein Projekt manuell hinzu oder importiere aus <code class="bg-slate-100 rounded px-1">~/development/</code></p>
+  </div>
+{% endif %}

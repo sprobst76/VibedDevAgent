@@ -88,6 +88,10 @@ bash scripts/matrix_quick_test.sh
 
 # Voller No-Sudo-Autotest (isoliert unter /tmp, inkl. approve/stop)
 bash scripts/matrix_no_sudo_test.sh
+
+# Live-Events im Terminal ansehen (ohne Element)
+python3 scripts/matrix_tail.py --once
+python3 scripts/matrix_tail.py
 ```
 
 ## Post-Reboot Check

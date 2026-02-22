@@ -136,6 +136,36 @@ mkdir -p docs
 touch docs/reliability.md
 ```
 
+## P1-SECURITY -- Service-User Härtung (HOHE PRIORITÄT)
+
+### 14) Option C: devagent-User vollständig einrichten ⚠️ HOHE PRIO
+**Hintergrund:** Aktuell läuft der Service als `spro` (temporäre Lösung, Option A).
+Das ist für Entwicklung ok, aber nicht für produktiven Betrieb.
+
+- [ ] `devagent`-User mit Login-Shell ausstatten: `sudo usermod -s /bin/bash devagent`
+- [ ] Home-Dir für devagent einrichten (z.B. `/srv/devagent-home`) für `~/.claude/` Config
+- [ ] Node.js via nvm für `devagent` installieren
+- [ ] `claude` CLI für `devagent` installieren: `npm install -g @anthropic-ai/claude-code`
+- [ ] Claude-Auth für devagent einrichten: entweder OAuth (`claude auth login`) oder API Key in `.env`
+- [ ] Service-Unit zurück auf `User=devagent` stellen
+- [ ] Log-Verzeichnis `/var/log/devagent/` Ownership auf `devagent` korrigieren
+- [ ] Testen: `sudo -u devagent claude --version`
+
+**Warum wichtig:** Solange der Service als `spro` läuft, hat ein bösartiger Job-Command
+Zugriff auf SSH-Keys, Browser-Profile und alle anderen Projekte des Users.
+
+### 15) Option E: Direkte Anthropic API (mittelfristige Alternative)
+**Hintergrund:** Statt `claude` CLI direkt die Python-API nutzen.
+
+- [ ] `anthropic` Python-Package als einzige externe Abhängigkeit erlauben
+- [ ] Eigenen Agentic-Loop implementieren (Tool-Calls: read_file, write_file, run_shell)
+- [ ] Prompt-Templates pro Task-Typ definieren
+- [ ] Kosten-Tracking (Token-Usage pro Job in audit.jsonl)
+- [ ] Vorteil: Kein Node.js, kein Home-Dir-Problem, volle Kontrolle über Prompts
+
+**Wann sinnvoll:** Wenn claude CLI zu viel Overhead hat oder feinere Steuerung
+(Kosten, Kontext, Tools) gewünscht wird.
+
 ## P2 -- Ausbau
 
 ### 12) Web-UI auf VPS (on-demand)
@@ -164,3 +194,42 @@ touch docs/event-push.md
 4. P0.6-P0.7 (Approval/Security + Service)
 5. P0.8 (MVP-Abnahme)
 6. P1 danach P2
+
+---
+
+## P3 — AI Agent Verbesserungen (priorisiert 2026-02)
+
+### 16) Token Auto-Refresh
+- [ ] Bei 401-Fehler im Worker: automatisch `matrix_login.sh` aufrufen oder Refresh-Token-Flow implementieren
+- [ ] Alternativ: Cronjob der `matrix_login.sh operator` täglich ausführt
+- [ ] Ziel: kein manueller Token-Wechsel mehr nötig
+
+### 17) Lange Antworten aufteilen
+- [ ] Claude-Ausgaben > 3800 Zeichen in mehrere Matrix-Nachrichten splitten (sinnvolle Trennung nach Absätzen)
+- [ ] Alternativ: als Matrix-File-Upload (m.file event)
+- [ ] MAX_OUTPUT_CHARS in .env konfigurierbar machen
+
+### 18) Live-Log im Browser
+- [ ] Server-Sent Events Endpoint `/api/logs/stream`
+- [ ] Letzte 100 Zeilen von `core.log` + live tail
+- [ ] UI-Panel in der Detail-Ansicht
+
+### 19) Multi-Backend UI
+- [ ] UI kann mehrere Backend-URLs konfigurieren (z.B. Heim-PC + VPS)
+- [ ] Jeder Backend liefert `/api/health` + `/api/projects` + `/api/jobs`
+- [ ] Aggregierte Ansicht aller Backends in einem Frontend
+
+### 20) Kein `!ai`-Prefix in Projekt-Räumen (opt-in)
+- [ ] Per CLAUDE.md oder projects.json: `auto_reply: true` für einen Raum
+- [ ] Jede Nachricht von erlaubten Usern wird direkt an Claude weitergeleitet
+- [ ] Mention-Gating als Alternative (nur bei @devagent-bot)
+
+### 21) Scheduled Tasks
+- [ ] `!schedule "täglich 09:00" <aufgabe>` — Cron-ähnliche Tasks pro Raum
+- [ ] Gespeichert in SQLite oder JSON
+- [ ] Inspiriert von NanoClaw task-scheduler.ts
+
+### 22) PTY-Modus für Claude Code
+- [ ] `subprocess.Popen` mit `pty.openpty()` für bessere Kompatibilität
+- [ ] Vor allem relevant wenn `--print` entfernt wird
+- [ ] Referenz: OpenClaw coding-agent SKILL.md `pty:true`

@@ -32,6 +32,7 @@ if [ -e "$WT_PATH" ]; then
 fi
 
 # Detached checkout avoids branch-in-use conflicts with the main checkout.
-git -C "$REPO_ROOT" worktree add --detach "$WT_PATH" "$BASE_BRANCH"
+# Redirect git output to stderr so only the worktree path goes to stdout.
+git -C "$REPO_ROOT" worktree add --detach "$WT_PATH" "$BASE_BRANCH" >&2
 
 echo "$WT_PATH"

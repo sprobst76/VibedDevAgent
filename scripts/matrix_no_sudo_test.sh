@@ -50,6 +50,26 @@ cd "$ROOT_DIR"
 
 echo "[1/8] room info"
 python3 scripts/matrix_room_info.py >/tmp/devagent-room-info-${JOB_ID}.json
+if grep -q '"algorithm"' "/tmp/devagent-room-info-${JOB_ID}.json"; then
+  echo "WARN: Room appears to be encrypted (m.room.encryption found)." >&2
+  echo "      This raw API client sends unencrypted m.room.message and Element may hide it." >&2
+fi
+
+# Pre-sync: get current batch token so the worker only processes events sent AFTER this point.
+echo "[1b/8] pre-sync to anchor since token"
+python3 -c "
+import json, os, sys
+sys.path.insert(0, '.')
+from adapters.matrix.client import MatrixClient
+client = MatrixClient(os.environ['MATRIX_HOMESERVER_URL'], os.environ['MATRIX_ACCESS_TOKEN'])
+r = client.sync(since=None, timeout_ms=5000)
+state_file = os.environ.get('DEVAGENT_MATRIX_STATE_FILE', '')
+if state_file:
+    import pathlib
+    pathlib.Path(state_file).parent.mkdir(parents=True, exist_ok=True)
+    pathlib.Path(state_file).write_text(json.dumps({'since': r.next_batch, 'jobcards': {}, 'job_states': {}}))
+    print(f'since anchored: {r.next_batch[:40]}...')
+"
 
 echo "[2/8] send visible jobcard"
 SEND_OUT=""

@@ -1,67 +1,67 @@
-<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden" id="detail-panel">
+<div class="bg-drac-surface border border-drac-line rounded-xl shadow-lg overflow-hidden" id="detail-panel">
 
   <!-- Header -->
-  <div class="flex items-center justify-between px-5 py-4 bg-slate-50 border-b border-slate-100">
+  <div class="flex items-center justify-between px-5 py-4 bg-drac-bg border-b border-drac-line">
     <div>
-      <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Projekt</p>
-      <h2 class="text-base font-bold text-slate-800 mt-0.5">{{ name }}</h2>
+      <p class="text-xs text-drac-comment uppercase tracking-wide font-medium">Projekt</p>
+      <h2 class="text-base font-bold text-drac-fg mt-0.5">{{ name }}</h2>
     </div>
     <button onclick="document.getElementById('side-panel').innerHTML=''"
-            class="text-xs text-slate-400 hover:text-slate-600 transition-colors">✕</button>
+            class="text-xs text-drac-comment hover:text-drac-fg transition-colors">✕</button>
   </div>
 
   <div class="px-5 py-4 space-y-5">
 
     <!-- Settings -->
     <div class="space-y-2">
-      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Einstellungen</h3>
+      <h3 class="text-xs font-semibold text-drac-comment uppercase tracking-wider">Einstellungen</h3>
       <div class="grid grid-cols-[120px_1fr] gap-x-3 gap-y-2 text-xs">
-        <span class="text-slate-400 pt-0.5">Lokaler Pfad</span>
-        <span class="font-mono bg-slate-50 border border-slate-200 rounded px-2 py-1 break-all">{{ local_path }}</span>
+        <span class="text-drac-comment pt-0.5">Lokaler Pfad</span>
+        <span class="font-mono bg-drac-bg border border-drac-line rounded px-2 py-1 break-all text-drac-fg">{{ local_path }}</span>
         {% if proj %}
-          <span class="text-slate-400 pt-0.5">Matrix Raum</span>
-          <span class="font-mono bg-slate-50 border border-slate-200 rounded px-2 py-1 break-all">{{ proj.matrix_room_id or '—' }}</span>
-          <span class="text-slate-400 pt-0.5">Raum-Name</span>
-          <span class="text-slate-700">{{ proj.matrix_room_name or '—' }}</span>
-          <span class="text-slate-400 pt-0.5">Erstellt</span>
-          <span class="text-slate-500">{{ proj.created_at[:19] if proj.created_at else '—' }}</span>
+          <span class="text-drac-comment pt-0.5">Matrix Raum</span>
+          <span class="font-mono bg-drac-bg border border-drac-line rounded px-2 py-1 break-all text-drac-fg">{{ proj.matrix_room_id or '—' }}</span>
+          <span class="text-drac-comment pt-0.5">Raum-Name</span>
+          <span class="text-drac-fg">{{ proj.matrix_room_name or '—' }}</span>
+          <span class="text-drac-comment pt-0.5">Erstellt</span>
+          <span class="text-drac-comment">{{ proj.created_at[:19] if proj.created_at else '—' }}</span>
         {% else %}
-          <span class="text-slate-400 pt-0.5">Status</span>
-          <span class="text-amber-600">Noch nicht initialisiert</span>
+          <span class="text-drac-comment pt-0.5">Status</span>
+          <span class="text-drac-orange">Noch nicht initialisiert</span>
         {% endif %}
       </div>
     </div>
 
     <!-- tmux -->
     <div class="space-y-2">
-      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">tmux</h3>
+      <h3 class="text-xs font-semibold text-drac-comment uppercase tracking-wider">tmux</h3>
       <div class="flex gap-2 items-center flex-wrap">
         <button hx-post="/projects/{{ name }}/tmux"
                 hx-target="#detail-tmux-status"
                 hx-swap="innerHTML"
-                class="text-xs bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-1.5 transition-colors font-medium">
+                class="text-xs bg-drac-purple hover:bg-[#a57ee8] text-drac-bg rounded-lg px-3 py-1.5 transition-colors font-medium">
           Session starten / prüfen
         </button>
-        <span class="font-mono text-xs text-slate-400">tmux attach -t dev-{{ name }}</span>
+        <span class="font-mono text-xs text-drac-comment">tmux attach -t dev-{{ name }}</span>
       </div>
       <div id="detail-tmux-status" class="text-xs"></div>
     </div>
 
     <!-- CLAUDE.md editor -->
     <div class="space-y-2">
-      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">CLAUDE.md</h3>
+      <h3 class="text-xs font-semibold text-drac-comment uppercase tracking-wider">CLAUDE.md</h3>
       <div hx-get="/projects/{{ name }}/claude-md"
            hx-trigger="load"
            hx-swap="innerHTML">
-        <p class="text-xs text-slate-400">Lädt…</p>
+        <p class="text-xs text-drac-comment">Lädt…</p>
       </div>
     </div>
 
     <!-- Recent Jobs -->
     <div class="space-y-2">
       <div class="flex items-center justify-between">
-        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Letzte Jobs</h3>
-        <a href="/jobs" class="text-xs text-blue-500 hover:text-blue-700 transition-colors">Alle anzeigen →</a>
+        <h3 class="text-xs font-semibold text-drac-comment uppercase tracking-wider">Letzte Jobs</h3>
+        <a href="/jobs" class="text-xs text-drac-purple hover:text-[#a57ee8] transition-colors">Alle anzeigen →</a>
       </div>
       {% if jobs %}
         <div class="space-y-1">
@@ -70,26 +70,26 @@
              hx-get="/jobs/{{ job.job_id }}"
              hx-target="#job-detail"
              hx-push-url="/jobs"
-             class="flex items-center gap-3 text-xs p-2 rounded-lg hover:bg-slate-50 transition-colors group">
-            <span class="font-mono text-slate-500 w-16 truncate shrink-0">{{ job.short_id }}…</span>
+             class="flex items-center gap-3 text-xs p-2 rounded-lg hover:bg-drac-line/20 transition-colors group">
+            <span class="font-mono text-drac-comment w-16 truncate shrink-0">{{ job.short_id }}…</span>
             {% if job.state == 'RUNNING' %}
-              <span class="bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">RUNNING</span>
+              <span class="bg-drac-cyan/10 text-drac-cyan border border-drac-cyan/30 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">RUNNING</span>
             {% elif job.state == 'DONE' %}
-              <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">✓ DONE</span>
+              <span class="bg-drac-green/10 text-drac-green border border-drac-green/30 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">✓ DONE</span>
             {% elif job.state == 'FAILED' %}
-              <span class="bg-red-50 text-red-600 border border-red-200 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">✗ FAILED</span>
+              <span class="bg-drac-red/10 text-drac-red border border-drac-red/30 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">✗ FAILED</span>
             {% elif job.state == 'CANCELLED' %}
-              <span class="bg-slate-100 text-slate-500 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">🛑</span>
+              <span class="bg-drac-comment/20 text-drac-comment rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">🛑</span>
             {% else %}
-              <span class="bg-slate-100 text-slate-500 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">{{ job.state }}</span>
+              <span class="bg-drac-line/40 text-drac-comment rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0">{{ job.state }}</span>
             {% endif %}
-            <span class="text-slate-400 truncate">{{ job.action }}</span>
-            <span class="text-slate-300 font-mono ml-auto shrink-0">{{ job.updated_at[:16] if job.updated_at else job.timestamp[:16] if job.timestamp else '' }}</span>
+            <span class="text-drac-comment truncate">{{ job.action }}</span>
+            <span class="text-drac-line font-mono ml-auto shrink-0">{{ job.updated_at[:16] if job.updated_at else job.timestamp[:16] if job.timestamp else '' }}</span>
           </a>
           {% endfor %}
         </div>
       {% else %}
-        <p class="text-xs text-slate-400 py-2">Noch keine Jobs für dieses Projekt.</p>
+        <p class="text-xs text-drac-comment py-2">Noch keine Jobs für dieses Projekt.</p>
       {% endif %}
     </div>
 

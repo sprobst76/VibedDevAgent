@@ -430,12 +430,12 @@ async def open_tmux(request: Request, name: str):
         if has.returncode != 0:
             subprocess.run(["tmux", "new-session", "-d", "-s", session, "-c", cwd], check=True)
         return HTMLResponse(
-            f"<span class='text-green-700 font-mono text-sm'>"
+            f"<span class='text-[#50fa7b] font-mono text-sm'>"
             f"Session <b>{session}</b> bereit — "
-            f"<code class='bg-slate-100 px-1 rounded'>tmux attach -t {session}</code></span>"
+            f"<code class='bg-[#44475a] px-1 rounded text-[#f8f8f2]'>tmux attach -t {session}</code></span>"
         )
     except Exception as exc:
-        return HTMLResponse(f"<p class='text-red-600 text-sm'>tmux-Fehler: {exc}</p>")
+        return HTMLResponse(f"<p class='text-[#ff5555] text-sm'>tmux-Fehler: {exc}</p>")
 
 
 @app.get("/projects/{name}/claude-md", response_class=HTMLResponse)
@@ -464,7 +464,7 @@ async def save_claude_md(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return HTMLResponse(
-        "<p class='text-emerald-600 text-xs'>✓ CLAUDE.md gespeichert.</p>",
+        "<p class='text-[#50fa7b] text-xs'>✓ CLAUDE.md gespeichert.</p>",
         headers={"HX-Trigger": "claudeMdSaved"},
     )
 
@@ -542,13 +542,15 @@ async def api_worker_status(request: Request, format: str = "json"):
 
     if format == "html" or request.headers.get("HX-Request"):
         if running:
-            dot   = "bg-emerald-500"
+            dot   = "bg-[#50fa7b]"
             label = f"Worker aktiv · {len(rooms_watched)} Raum/Räume"
+            text  = "text-[#50fa7b]"
         else:
-            dot   = "bg-red-400"
+            dot   = "bg-[#ff5555]"
             label = f"Worker offline{' · ' + error if error else ''}"
+            text  = "text-[#ff5555]"
         return HTMLResponse(
-            f'<span class="flex items-center gap-1.5 text-xs text-slate-500">'
+            f'<span class="flex items-center gap-1.5 text-xs {text}">'
             f'<span class="w-2 h-2 rounded-full {dot} inline-block"></span>'
             f'{label}</span>'
         )
@@ -652,33 +654,32 @@ async def stats_partial(request: Request):
         except Exception:
             pass
 
-    worker_dot = "bg-emerald-500" if worker_ok else "bg-red-400"
+    worker_dot = "bg-[#50fa7b]" if worker_ok else "bg-[#ff5555]"
     worker_label = "aktiv" if worker_ok else "offline"
+    worker_text = "text-[#50fa7b]" if worker_ok else "text-[#ff5555]"
 
     cards = [
-        ("Projekte", str(projects_count), "text-slate-700", "bg-slate-50", "border-slate-200"),
-        ("Laufend", str(running), "text-blue-700" if running else "text-slate-700",
-         "bg-blue-50" if running else "bg-slate-50",
-         "border-blue-200" if running else "border-slate-200"),
-        ("Jobs gesamt", str(len(jobs)), "text-slate-700", "bg-slate-50", "border-slate-200"),
-        ("Letzter Job", last_job_at, "text-slate-600", "bg-slate-50", "border-slate-200"),
+        ("Projekte", str(projects_count), "text-[#bd93f9]"),
+        ("Laufend", str(running), "text-[#8be9fd]" if running else "text-[#6272a4]"),
+        ("Jobs gesamt", str(len(jobs)), "text-[#f8f8f2]"),
+        ("Letzter Job", last_job_at, "text-[#6272a4]"),
     ]
 
     html = '<div class="grid grid-cols-2 sm:grid-cols-5 gap-3">'
-    for label, value, text_cls, bg_cls, border_cls in cards:
+    for label, value, text_cls in cards:
         html += (
-            f'<div class="{bg_cls} border {border_cls} rounded-xl p-4">'
-            f'<p class="text-xs text-slate-400 font-medium">{label}</p>'
+            f'<div class="bg-[#21222c] border border-[#44475a] rounded-xl p-4">'
+            f'<p class="text-xs text-[#6272a4] font-medium">{label}</p>'
             f'<p class="text-xl font-bold {text_cls} mt-1 truncate">{value}</p>'
             f'</div>'
         )
     # Worker status card
     html += (
-        f'<div class="bg-white border border-slate-200 rounded-xl p-4">'
-        f'<p class="text-xs text-slate-400 font-medium">Worker</p>'
+        f'<div class="bg-[#21222c] border border-[#44475a] rounded-xl p-4">'
+        f'<p class="text-xs text-[#6272a4] font-medium">Worker</p>'
         f'<div class="flex items-center gap-2 mt-1">'
         f'<span class="w-2.5 h-2.5 rounded-full {worker_dot} inline-block shrink-0"></span>'
-        f'<span class="text-sm font-semibold text-slate-700">{worker_label}</span>'
+        f'<span class="text-sm font-semibold {worker_text}">{worker_label}</span>'
         f'</div>'
         f'</div>'
     )

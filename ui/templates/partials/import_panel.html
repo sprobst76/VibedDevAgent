@@ -1,13 +1,13 @@
-<div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+<div class="bg-drac-surface border border-drac-line rounded-xl p-5 shadow-lg space-y-4">
 
   <div class="flex items-center justify-between">
-    <h2 class="font-semibold text-base">Aus ~/development importieren</h2>
+    <h2 class="font-semibold text-base text-drac-fg">Aus ~/development importieren</h2>
     <button onclick="document.getElementById('side-panel').innerHTML=''"
-            class="text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
+            class="text-drac-comment hover:text-drac-fg text-lg leading-none transition-colors">✕</button>
   </div>
 
   {% if found %}
-    <p class="text-xs text-slate-500">
+    <p class="text-xs text-drac-comment">
       {{ found | length }} Git-Repos gefunden, noch nicht registriert.
       Wähle die Projekte die du hinzufügen möchtest.
     </p>
@@ -22,48 +22,48 @@
       <!-- Project checkboxes -->
       <div class="space-y-1 max-h-72 overflow-y-auto pr-1">
         {% for p in found %}
-          <label class="flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-slate-50 cursor-pointer group">
+          <label class="flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-drac-line/20 cursor-pointer group">
             <input type="checkbox" name="projects" value="{{ p.name }}"
-                   class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                   class="rounded border-drac-line text-drac-purple focus:ring-drac-purple/50 bg-drac-bg">
             <div class="min-w-0">
-              <span class="text-sm font-medium text-slate-700">{{ p.name }}</span>
-              <span class="text-xs text-slate-400 font-mono ml-2 truncate block">{{ p.local_path }}</span>
+              <span class="text-sm font-medium text-drac-fg">{{ p.name }}</span>
+              <span class="text-xs text-drac-comment font-mono ml-2 truncate block">{{ p.local_path }}</span>
             </div>
           </label>
         {% endfor %}
       </div>
 
       <!-- Select all toggle -->
-      <div class="flex gap-2 text-xs text-slate-500 border-t border-slate-100 pt-3">
+      <div class="flex gap-2 text-xs text-drac-comment border-t border-drac-line pt-3">
         <button type="button"
                 onclick="this.closest('form').querySelectorAll('input[type=checkbox][name=projects]').forEach(c=>c.checked=true)"
-                class="hover:text-emerald-700 transition-colors">Alle auswählen</button>
+                class="hover:text-drac-purple transition-colors">Alle auswählen</button>
         <span>·</span>
         <button type="button"
                 onclick="this.closest('form').querySelectorAll('input[type=checkbox][name=projects]').forEach(c=>c.checked=false)"
-                class="hover:text-emerald-700 transition-colors">Keine</button>
+                class="hover:text-drac-purple transition-colors">Keine</button>
       </div>
 
       <!-- Option: create Matrix rooms -->
-      <label class="flex items-center gap-2 cursor-pointer border-t border-slate-100 pt-3">
+      <label class="flex items-center gap-2 cursor-pointer border-t border-drac-line pt-3">
         <input type="checkbox" name="create_rooms"
-               class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-        <span class="text-sm text-slate-700">Matrix-Räume für alle ausgewählten erstellen</span>
+               class="rounded border-drac-line text-drac-purple focus:ring-drac-purple/50 bg-drac-bg">
+        <span class="text-sm text-drac-fg">Matrix-Räume für alle ausgewählten erstellen</span>
       </label>
-      <p class="text-xs text-slate-400 -mt-2">
+      <p class="text-xs text-drac-comment -mt-2">
         Pro Projekt wird ein unverschlüsselter Raum angelegt und der Bot eingeladen.
       </p>
 
       <button type="submit"
-              class="w-full text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-colors font-medium">
+              class="w-full text-sm bg-drac-purple hover:bg-[#a57ee8] disabled:opacity-50 disabled:cursor-not-allowed text-drac-bg rounded-lg px-4 py-2 transition-colors font-medium">
         Ausgewählte importieren
       </button>
     </form>
 
   {% else %}
-    <div class="text-center py-8 text-slate-400">
+    <div class="text-center py-8 text-drac-comment">
       <div class="text-3xl mb-2">✅</div>
-      <p class="text-sm">Alle Projekte aus <code class="bg-slate-100 rounded px-1">~/development/</code><br>sind bereits registriert.</p>
+      <p class="text-sm">Alle Projekte aus <code class="bg-drac-line/40 rounded px-1 text-drac-fg">~/development/</code><br>sind bereits registriert.</p>
     </div>
   {% endif %}
 

@@ -6,34 +6,35 @@
 
   <div class="flex items-center justify-between flex-wrap gap-3">
     <div>
-      <h1 class="text-xl font-bold tracking-tight">Live Log</h1>
-      <p class="text-xs text-slate-400 font-mono mt-0.5">{{ log_file }}</p>
+      <h1 class="text-xl font-bold tracking-tight text-drac-fg">Live Log</h1>
+      <p class="text-xs text-drac-comment font-mono mt-0.5">{{ log_file }}</p>
     </div>
     <div class="flex gap-2 items-center flex-wrap">
-      <span id="sse-status" class="text-xs text-slate-400">Verbinde…</span>
+      <span id="sse-status" class="text-xs text-drac-comment">Verbinde…</span>
       <!-- Filter input -->
       <input id="log-filter" type="text" placeholder="Filter…"
              oninput="applyFilter()"
-             class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 w-40 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white">
+             class="text-xs bg-drac-surface border border-drac-line rounded-lg px-3 py-1.5 w-40
+                    focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple
+                    text-drac-fg placeholder:text-drac-line">
       <!-- Timestamp toggle -->
       <button id="ts-toggle" onclick="toggleTimestamps()"
-              class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+              class="text-xs bg-drac-surface border border-drac-line hover:border-drac-comment text-drac-comment hover:text-drac-fg rounded-lg px-3 py-1.5 transition-colors">
         Timestamps
       </button>
       <button onclick="clearLog()"
-              class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+              class="text-xs bg-drac-surface border border-drac-line hover:border-drac-comment text-drac-comment hover:text-drac-fg rounded-lg px-3 py-1.5 transition-colors">
         Leeren
       </button>
       <button id="scroll-toggle" onclick="toggleAutoScroll()"
-              class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+              class="text-xs bg-drac-surface border border-drac-line hover:border-drac-comment text-drac-comment hover:text-drac-fg rounded-lg px-3 py-1.5 transition-colors">
         Auto-Scroll: Ein
       </button>
     </div>
   </div>
 
   <div id="log-container"
-       class="bg-slate-900 rounded-xl overflow-auto h-[74vh] p-4 space-y-0">
-    <!-- lines rendered as spans inside pre -->
+       class="bg-drac-surface border border-drac-line rounded-xl overflow-auto h-[74vh] p-4 space-y-0">
     <pre id="log-output" class="text-xs font-mono whitespace-pre-wrap break-words min-h-full"></pre>
   </div>
 
@@ -46,15 +47,14 @@
   const filterEl   = document.getElementById('log-filter');
   let autoScroll   = true;
   let showTs       = true;
-  let allLines     = [];    // raw lines buffer
+  let allLines     = [];
   const MAX_LINES  = 2000;
 
-  // Level detection
   function levelClass(line) {
-    if (/\bERROR\b|\bCRITICAL\b/.test(line)) return 'text-red-400';
-    if (/\bWARNING\b|\bWARN\b/.test(line))  return 'text-amber-400';
-    if (/\bDEBUG\b/.test(line))             return 'text-slate-500';
-    return 'text-emerald-300';
+    if (/\bERROR\b|\bCRITICAL\b/.test(line)) return 'text-[#ff5555]';
+    if (/\bWARNING\b|\bWARN\b/.test(line))   return 'text-[#ffb86c]';
+    if (/\bDEBUG\b/.test(line))              return 'text-[#6272a4]';
+    return 'text-[#50fa7b]';
   }
 
   function stripTimestamp(line) {
@@ -95,12 +95,12 @@
 
   es.onopen = function() {
     statusEl.textContent = '● Verbunden';
-    statusEl.className = 'text-xs text-emerald-500';
+    statusEl.className = 'text-xs text-[#50fa7b]';
   };
   es.onmessage = function(e) { appendLine(e.data); };
   es.onerror = function() {
     statusEl.textContent = '○ Getrennt — reconnecting…';
-    statusEl.className = 'text-xs text-red-400';
+    statusEl.className = 'text-xs text-[#ff5555]';
   };
 </script>
 {% endblock %}

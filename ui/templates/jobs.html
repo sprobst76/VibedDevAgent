@@ -8,20 +8,20 @@
   <div class="flex-1 min-w-0 space-y-4">
 
     <div class="flex items-center justify-between flex-wrap gap-3">
-      <h1 class="text-xl font-bold tracking-tight">Jobs</h1>
+      <h1 class="text-xl font-bold tracking-tight text-drac-fg">Jobs</h1>
       <div class="flex gap-2 text-xs">
-        <button onclick="filterJobs('')"       id="tab-all"     class="tab-btn tab-active px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium">Alle</button>
-        <button onclick="filterJobs('RUNNING')" id="tab-running" class="tab-btn px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-500">Laufend</button>
-        <button onclick="filterJobs('DONE')"    id="tab-done"    class="tab-btn px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-500">Erledigt</button>
-        <button onclick="filterJobs('FAILED')"  id="tab-failed"  class="tab-btn px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-500">Fehlschlag</button>
+        <button onclick="filterJobs('')"       id="tab-all"     class="tab-btn tab-active px-3 py-1.5 rounded-lg border border-drac-line font-medium transition-colors">Alle</button>
+        <button onclick="filterJobs('RUNNING')" id="tab-running" class="tab-btn px-3 py-1.5 rounded-lg border border-drac-line bg-drac-surface text-drac-comment font-medium transition-colors">Laufend</button>
+        <button onclick="filterJobs('DONE')"    id="tab-done"    class="tab-btn px-3 py-1.5 rounded-lg border border-drac-line bg-drac-surface text-drac-comment font-medium transition-colors">Erledigt</button>
+        <button onclick="filterJobs('FAILED')"  id="tab-failed"  class="tab-btn px-3 py-1.5 rounded-lg border border-drac-line bg-drac-surface text-drac-comment font-medium transition-colors">Fehlschlag</button>
       </div>
     </div>
 
     {% if jobs %}
-    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+    <div class="bg-drac-surface border border-drac-line rounded-xl overflow-hidden shadow-lg">
       <table class="w-full text-sm border-collapse" id="jobs-table">
-        <thead class="bg-slate-50 border-b border-slate-200">
-          <tr class="text-left text-slate-500 text-xs font-semibold uppercase tracking-wide">
+        <thead class="border-b border-drac-line">
+          <tr class="text-left text-drac-comment text-xs font-semibold uppercase tracking-wide">
             <th class="px-4 py-3">Job-ID</th>
             <th class="px-4 py-3">Projekt</th>
             <th class="px-4 py-3">Status</th>
@@ -30,46 +30,46 @@
             <th class="px-4 py-3">Von</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
+        <tbody class="divide-y divide-drac-line/50">
           {% for job in jobs %}
-          <tr class="job-row hover:bg-slate-50 cursor-pointer transition-colors"
+          <tr class="job-row cursor-pointer transition-colors hover:bg-drac-line/20"
               data-state="{{ job.state }}"
               hx-get="/jobs/{{ job.job_id }}"
               hx-target="#job-detail"
               hx-swap="innerHTML"
               onclick="setActiveRow(this)">
-            <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ job.short_id }}…</td>
-            <td class="px-4 py-3 font-medium text-slate-700">{{ job.project or '—' }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-drac-comment">{{ job.short_id }}…</td>
+            <td class="px-4 py-3 font-medium text-drac-fg">{{ job.project or '—' }}</td>
             <td class="px-4 py-3">
               {% if job.state == 'RUNNING' %}
-                <span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>RUNNING
+                <span class="inline-flex items-center gap-1 bg-drac-cyan/10 text-drac-cyan border border-drac-cyan/30 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  <span class="w-1.5 h-1.5 rounded-full bg-drac-cyan animate-pulse"></span>RUNNING
                 </span>
               {% elif job.state == 'DONE' %}
-                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-medium">✓ DONE</span>
+                <span class="bg-drac-green/10 text-drac-green border border-drac-green/30 rounded-full px-2.5 py-0.5 text-xs font-medium">✓ DONE</span>
               {% elif job.state == 'FAILED' %}
-                <span class="bg-red-50 text-red-600 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-medium">✗ FAILED</span>
+                <span class="bg-drac-red/10 text-drac-red border border-drac-red/30 rounded-full px-2.5 py-0.5 text-xs font-medium">✗ FAILED</span>
               {% elif job.state == 'CANCELLED' %}
-                <span class="bg-slate-100 text-slate-500 border border-slate-200 rounded-full px-2.5 py-0.5 text-xs font-medium">🛑 CANCELLED</span>
+                <span class="bg-drac-comment/20 text-drac-comment border border-drac-comment/30 rounded-full px-2.5 py-0.5 text-xs font-medium">🛑 CANCELLED</span>
               {% elif job.state == 'WAIT_APPROVAL' %}
-                <span class="bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 text-xs font-medium">⏳ WARTEN</span>
+                <span class="bg-drac-orange/10 text-drac-orange border border-drac-orange/30 rounded-full px-2.5 py-0.5 text-xs font-medium">⏳ WARTEN</span>
               {% else %}
-                <span class="bg-slate-100 text-slate-500 rounded-full px-2.5 py-0.5 text-xs font-medium">{{ job.state }}</span>
+                <span class="bg-drac-line/40 text-drac-comment rounded-full px-2.5 py-0.5 text-xs font-medium">{{ job.state }}</span>
               {% endif %}
             </td>
-            <td class="px-4 py-3 text-slate-400 text-xs font-mono">{{ job.created_at[:16] if job.created_at else '—' }}</td>
-            <td class="px-4 py-3 text-slate-400 text-xs font-mono">{{ job.updated_at[:16] if job.updated_at else '—' }}</td>
-            <td class="px-4 py-3 text-slate-400 text-xs truncate max-w-[140px]">{{ job.requested_by or '—' }}</td>
+            <td class="px-4 py-3 text-drac-comment text-xs font-mono">{{ job.created_at[:16] if job.created_at else '—' }}</td>
+            <td class="px-4 py-3 text-drac-comment text-xs font-mono">{{ job.updated_at[:16] if job.updated_at else '—' }}</td>
+            <td class="px-4 py-3 text-drac-comment text-xs truncate max-w-[140px]">{{ job.requested_by or '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     {% else %}
-    <div class="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400 shadow-sm">
+    <div class="bg-drac-surface border border-drac-line rounded-xl p-12 text-center shadow-sm">
       <p class="text-4xl mb-3">📋</p>
-      <p class="font-medium">Noch keine Jobs vorhanden</p>
-      <p class="text-sm mt-1">Jobs erscheinen hier sobald Jobcards genehmigt wurden.</p>
+      <p class="font-medium text-drac-fg">Noch keine Jobs vorhanden</p>
+      <p class="text-sm mt-1 text-drac-comment">Jobs erscheinen hier sobald Jobcards genehmigt wurden.</p>
     </div>
     {% endif %}
 
@@ -77,17 +77,22 @@
 
   <!-- Right: job detail panel -->
   <div id="job-detail" class="w-[440px] shrink-0 sticky top-6 space-y-0">
-    <div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-400 shadow-sm">
+    <div class="bg-drac-surface border border-drac-line rounded-xl p-8 text-center shadow-sm">
       <p class="text-3xl mb-2">🔍</p>
-      <p class="text-sm">Job auswählen für Details</p>
+      <p class="text-sm text-drac-comment">Job auswählen für Details</p>
     </div>
   </div>
 
 </div>
 
 <style>
-  .tab-active { background-color: #1e293b !important; color: white !important; border-color: #1e293b !important; }
-  .job-row-active { background-color: #eff6ff !important; }
+  .tab-active {
+    background-color: #bd93f9 !important;
+    color: #282a36 !important;
+    border-color: #bd93f9 !important;
+    font-weight: 600;
+  }
+  .job-row-active { background-color: rgba(189,147,249,0.1) !important; }
 </style>
 
 <script>

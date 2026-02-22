@@ -1,9 +1,9 @@
-<div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+<div class="bg-drac-surface border border-drac-line rounded-xl p-5 shadow-lg space-y-4">
 
   <div class="flex items-center justify-between">
-    <h2 class="font-semibold text-base">Projekt hinzufügen</h2>
+    <h2 class="font-semibold text-base text-drac-fg">Projekt hinzufügen</h2>
     <button onclick="document.getElementById('side-panel').innerHTML=''"
-            class="text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
+            class="text-drac-comment hover:text-drac-fg text-lg leading-none transition-colors">✕</button>
   </div>
 
   <form hx-post="/projects/add"
@@ -13,41 +13,45 @@
         class="space-y-4">
 
     <div class="space-y-1">
-      <label class="text-xs font-medium text-slate-600">Projektname *</label>
+      <label class="text-xs font-medium text-drac-comment">Projektname *</label>
       <input type="text" name="name" required
              placeholder="z.B. VibedDevAgent"
-             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+             class="w-full text-sm bg-drac-bg border border-drac-line rounded-lg px-3 py-2 text-drac-fg
+                    focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple
+                    placeholder:text-drac-line">
     </div>
 
     <div class="space-y-1">
-      <label class="text-xs font-medium text-slate-600">Lokaler Pfad</label>
+      <label class="text-xs font-medium text-drac-comment">Lokaler Pfad</label>
       <input type="text" name="local_path"
              placeholder="/home/spro/development/&lt;name&gt;"
-             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
-      <p class="text-xs text-slate-400">Leer lassen = ~/development/&lt;name&gt;</p>
+             class="w-full text-sm bg-drac-bg border border-drac-line rounded-lg px-3 py-2 text-drac-fg
+                    focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple
+                    font-mono placeholder:text-drac-line">
+      <p class="text-xs text-drac-comment">Leer lassen = ~/development/&lt;name&gt;</p>
     </div>
 
     <!-- Matrix room action selector -->
-    <div class="border-t border-slate-100 pt-3 space-y-3">
-      <p class="text-xs font-medium text-slate-600">Matrix-Raum</p>
-      <div class="flex gap-3 text-sm">
+    <div class="border-t border-drac-line pt-3 space-y-3">
+      <p class="text-xs font-medium text-drac-comment">Matrix-Raum</p>
+      <div class="flex gap-3 text-sm flex-wrap">
         <label class="flex items-center gap-1.5 cursor-pointer">
           <input type="radio" name="room_action" value="" checked
                  onchange="showRoomPanel(this.value)"
-                 class="text-emerald-600 focus:ring-emerald-500">
-          <span class="text-slate-600">Keiner</span>
+                 class="text-drac-purple focus:ring-drac-purple/50">
+          <span class="text-drac-fg">Keiner</span>
         </label>
         <label class="flex items-center gap-1.5 cursor-pointer">
           <input type="radio" name="room_action" value="existing"
                  onchange="showRoomPanel(this.value)"
-                 class="text-emerald-600 focus:ring-emerald-500">
-          <span class="text-slate-600">Bestehenden verknüpfen</span>
+                 class="text-drac-purple focus:ring-drac-purple/50">
+          <span class="text-drac-fg">Bestehenden verknüpfen</span>
         </label>
         <label class="flex items-center gap-1.5 cursor-pointer">
           <input type="radio" name="room_action" value="new"
                  onchange="showRoomPanel(this.value)"
-                 class="text-emerald-600 focus:ring-emerald-500">
-          <span class="text-slate-600">Neuen erstellen</span>
+                 class="text-drac-purple focus:ring-drac-purple/50">
+          <span class="text-drac-fg">Neuen erstellen</span>
         </label>
       </div>
 
@@ -57,45 +61,53 @@
           <input type="text" id="room_search_input"
                  placeholder="Raum suchen…"
                  oninput="filterRooms(this.value)"
-                 class="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                 class="flex-1 text-sm bg-drac-bg border border-drac-line rounded-lg px-3 py-2 text-drac-fg
+                        focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple
+                        placeholder:text-drac-line">
           <button type="button"
                   onclick="loadRooms()"
-                  class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-2 transition-colors">
+                  class="text-xs bg-drac-line/40 hover:bg-drac-line text-drac-fg rounded-lg px-3 py-2 transition-colors">
             Suchen
           </button>
         </div>
         <div id="room_list"
-             class="max-h-48 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-100 text-sm hidden">
+             class="max-h-48 overflow-y-auto bg-drac-bg border border-drac-line rounded-lg divide-y divide-drac-line text-sm hidden">
         </div>
-        <p id="room_selected_label" class="text-xs text-emerald-700 hidden"></p>
-        <p id="room_error_label" class="text-xs text-red-500 hidden"></p>
+        <p id="room_selected_label" class="text-xs text-drac-green hidden"></p>
+        <p id="room_error_label" class="text-xs text-drac-red hidden"></p>
 
-        <div class="flex items-center gap-2 text-xs text-slate-400">
-          <div class="flex-1 border-t border-slate-100"></div>
+        <div class="flex items-center gap-2 text-xs text-drac-comment">
+          <div class="flex-1 border-t border-drac-line"></div>
           <span>oder direkt eingeben</span>
-          <div class="flex-1 border-t border-slate-100"></div>
+          <div class="flex-1 border-t border-drac-line"></div>
         </div>
 
         <input type="text" name="existing_room_id" id="existing_room_id_input"
                placeholder="!roomid:matrix.org"
-               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
+               class="w-full text-sm bg-drac-bg border border-drac-line rounded-lg px-3 py-2 text-drac-fg
+                      focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple
+                      font-mono placeholder:text-drac-line">
         <input type="text" name="room_name" id="existing_room_name_input"
                placeholder="Raum-Anzeigename (optional)"
-               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+               class="w-full text-sm bg-drac-bg border border-drac-line rounded-lg px-3 py-2 text-drac-fg
+                      focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple
+                      placeholder:text-drac-line">
       </div>
 
       <!-- Panel: new room -->
       <div id="room_panel_new" class="hidden space-y-1">
-        <label class="text-xs font-medium text-slate-600">Raum-Name</label>
+        <label class="text-xs font-medium text-drac-comment">Raum-Name</label>
         <input type="text" name="room_name"
                placeholder="DevAgent · &lt;projektname&gt;"
-               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+               class="w-full text-sm bg-drac-bg border border-drac-line rounded-lg px-3 py-2 text-drac-fg
+                      focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple
+                      placeholder:text-drac-line">
       </div>
     </div>
 
     <button type="submit"
             onclick="this.disabled=true; this.textContent='Wird hinzugefügt…'"
-            class="w-full text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 transition-colors font-medium">
+            class="w-full text-sm bg-drac-purple hover:bg-[#a57ee8] text-drac-bg rounded-lg px-4 py-2 transition-colors font-medium disabled:opacity-50">
       Hinzufügen
     </button>
   </form>
@@ -112,7 +124,7 @@ function showRoomPanel(action) {
 async function loadRooms() {
   const list = document.getElementById('room_list');
   const err  = document.getElementById('room_error_label');
-  list.innerHTML = '<div class="px-3 py-2 text-slate-400">Wird geladen…</div>';
+  list.innerHTML = '<div class="px-3 py-2 text-[#6272a4]">Wird geladen…</div>';
   list.classList.remove('hidden');
   err.classList.add('hidden');
   try {
@@ -140,14 +152,14 @@ function filterRooms(q) {
 function renderRooms(rooms) {
   const list = document.getElementById('room_list');
   if (!rooms.length) {
-    list.innerHTML = '<div class="px-3 py-2 text-slate-400 text-xs">Keine Räume gefunden</div>';
+    list.innerHTML = '<div class="px-3 py-2 text-[#6272a4] text-xs">Keine Räume gefunden</div>';
     return;
   }
   list.innerHTML = rooms.map(r => `
     <button type="button" onclick="selectRoom('${r.id}', '${r.name.replace(/'/g,"\\'")}' )"
-            class="w-full text-left px-3 py-2 hover:bg-emerald-50 transition-colors">
+            class="w-full text-left px-3 py-2 hover:bg-[#44475a]/30 transition-colors text-[#f8f8f2]">
       <span class="font-medium">${r.name || r.id}</span>
-      <span class="block text-xs text-slate-400 font-mono">${r.id}</span>
+      <span class="block text-xs text-[#6272a4] font-mono">${r.id}</span>
     </button>`).join('');
 }
 

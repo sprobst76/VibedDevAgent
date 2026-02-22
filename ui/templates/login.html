@@ -5,21 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DevAgent · Anmelden</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            drac: {
+              bg:      '#282a36',
+              surface: '#21222c',
+              line:    '#44475a',
+              fg:      '#f8f8f2',
+              comment: '#6272a4',
+              purple:  '#bd93f9',
+              red:     '#ff5555',
+            }
+          }
+        }
+      }
+    }
+  </script>
 </head>
-<body class="min-h-full bg-slate-50 flex items-center justify-center">
-  <div class="w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-    <h1 class="text-xl font-bold text-emerald-700 mb-1">DevAgent</h1>
-    <p class="text-sm text-slate-500 mb-6">Bitte API-Schlüssel eingeben.</p>
+<body class="min-h-full bg-drac-bg flex items-center justify-center">
+  <div class="w-full max-w-sm bg-drac-surface border border-drac-line rounded-2xl shadow-xl p-8">
+    <h1 class="text-xl font-bold mb-1"
+        style="background: linear-gradient(90deg, #bd93f9, #8be9fd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+      DevAgent
+    </h1>
+    <p class="text-sm text-drac-comment mb-6">Bitte API-Schlüssel eingeben.</p>
 
     {% if error %}
-    <p class="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+    <p class="mb-4 text-sm text-drac-red bg-[#ff5555]/10 border border-[#ff5555]/30 rounded-lg px-3 py-2">
       {{ error }}
     </p>
     {% endif %}
 
     <form method="post" action="/login">
       <input type="hidden" name="next" value="{{ next }}">
-      <label class="block text-xs font-medium text-slate-600 mb-1" for="api_key">API-Schlüssel</label>
+      <label class="block text-xs font-medium text-drac-comment mb-1" for="api_key">API-Schlüssel</label>
       <input
         id="api_key"
         name="api_key"
@@ -27,12 +49,14 @@
         autocomplete="current-password"
         required
         autofocus
-        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+        class="w-full bg-drac-bg border border-drac-line rounded-lg px-3 py-2 text-sm text-drac-fg
+               focus:outline-none focus:ring-2 focus:ring-drac-purple/50 focus:border-drac-purple mb-4
+               placeholder:text-drac-line"
         placeholder="••••••••"
       >
       <button
         type="submit"
-        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg px-4 py-2 text-sm transition-colors"
+        class="w-full bg-drac-purple hover:bg-[#a57ee8] text-drac-bg font-semibold rounded-lg px-4 py-2 text-sm transition-colors"
       >
         Anmelden
       </button>

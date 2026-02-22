@@ -9,10 +9,10 @@
        hx-get="/partials/stats"
        hx-trigger="load, every 60s"
        hx-swap="innerHTML">
-    <!-- filled by HTMX below -->
+    <!-- skeleton while loading -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-pulse">
       {% for _ in range(4) %}
-      <div class="bg-white border border-slate-200 rounded-xl p-4 h-16"></div>
+      <div class="bg-drac-surface border border-drac-line rounded-xl p-4 h-16"></div>
       {% endfor %}
     </div>
   </div>
@@ -20,19 +20,19 @@
   <!-- Header -->
   <div class="flex items-center justify-between flex-wrap gap-3">
     <div>
-      <h1 class="text-xl font-bold tracking-tight">Projekte</h1>
+      <h1 class="text-xl font-bold tracking-tight text-drac-fg">Projekte</h1>
     </div>
     <div class="flex gap-2">
       <button hx-get="/import"
               hx-target="#side-panel"
               hx-swap="innerHTML"
-              class="text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-4 py-2 transition-colors shadow-sm">
+              class="text-sm bg-drac-surface border border-drac-line hover:border-drac-comment text-drac-comment hover:text-drac-fg rounded-lg px-4 py-2 transition-colors">
         📂 Aus ~/development importieren
       </button>
       <button hx-get="/projects/add-form"
               hx-target="#side-panel"
               hx-swap="innerHTML"
-              class="text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 transition-colors shadow-sm">
+              class="text-sm bg-drac-purple hover:bg-[#a57ee8] text-drac-bg font-medium rounded-lg px-4 py-2 transition-colors">
         + Projekt hinzufügen
       </button>
     </div>
@@ -51,7 +51,6 @@
 </div>
 
 <script>
-// After stats load, replace the placeholder with real cards
 document.body.addEventListener("htmx:afterSwap", function(e) {
   if (e.detail.target && e.detail.target.id === "stat-cards") {
     // already replaced by server response

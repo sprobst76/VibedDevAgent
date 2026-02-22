@@ -9,6 +9,9 @@ artifacts/
 .env
 state/
 
+# Systemd service units (contain local paths/usernames — use *.service.example as template)
+ops/systemd/*.service
+
 # OS/editor
 .DS_Store
 .vscode/

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_NAME="${1:-devagent-live-test}"
-ALLOWED_USER="${2:-@alice:example.org}"
+ALLOWED_USER="${2:-@operator:example.org}"
 JOB_ID="${3:-$(date +%s)}"
 
 REPOS_ROOT="${DEVAGENT_REPOS_ROOT:-/srv/repos}"

@@ -2,8 +2,8 @@
 # matrix_login.sh — Login to Matrix and update MATRIX_ACCESS_TOKEN in .env
 #
 # Usage:
-#   ./scripts/matrix_login.sh operator    # login as @alice
-#   ./scripts/matrix_login.sh devagent    # login as @devagent
+#   ./scripts/matrix_login.sh operator    # login as the operator account (MATRIX_USER_OPERATOR)
+#   ./scripts/matrix_login.sh devagent    # login as the bot account (MATRIX_USER_DEVAGENT)
 #   ./scripts/matrix_login.sh             # interactive: choose user
 
 set -euo pipefail

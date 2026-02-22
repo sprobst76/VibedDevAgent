@@ -351,25 +351,23 @@ class LoadConfigFromEnvTests(unittest.TestCase):
         self.assertEqual(cfg.relogin_user, "@bot:matrix.org")
         self.assertEqual(cfg.relogin_password, "s3cr3t")
 
-    def test_relogin_user_falls_back_to_operator_vars(self) -> None:
-        env = self._env(
-            MATRIX_USER_OPERATOR="@operator:example.org",
-            MATRIX_PASSWORD_OPERATOR="pw2",
-        )
+    def test_relogin_user_empty_when_not_set(self) -> None:
+        """When MATRIX_USER_DEVAGENT is absent relogin_user defaults to empty string."""
+        env = self._env()  # no relogin vars
         with patch.dict(os.environ, env, clear=True):
             cfg = load_config_from_env()
-        self.assertEqual(cfg.relogin_user, "@operator:example.org")
+        self.assertEqual(cfg.relogin_user, "")
+        self.assertEqual(cfg.relogin_password, "")
 
-    def test_devagent_vars_take_priority_over_operator(self) -> None:
+    def test_relogin_password_loaded_from_env(self) -> None:
         env = self._env(
             MATRIX_USER_DEVAGENT="@bot:matrix.org",
-            MATRIX_PASSWORD_DEVAGENT="bot_pass",
-            MATRIX_USER_OPERATOR="@operator:example.org",
-            MATRIX_PASSWORD_OPERATOR="changeme",
+            MATRIX_PASSWORD_DEVAGENT="secret_pw",
         )
         with patch.dict(os.environ, env, clear=True):
             cfg = load_config_from_env()
         self.assertEqual(cfg.relogin_user, "@bot:matrix.org")
+        self.assertEqual(cfg.relogin_password, "secret_pw")
 
     def test_ai_timeout_from_env(self) -> None:
         env = self._env(DEVAGENT_AI_TIMEOUT_SECONDS="7200")

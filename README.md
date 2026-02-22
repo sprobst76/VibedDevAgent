@@ -68,7 +68,7 @@ python3 scripts/matrix_send_jobcard.py \
   --repo devagent-live-test \
   --branch main \
   --command "echo matrix-job && sleep 2" \
-  --requested-by "@alice:example.org"
+  --requested-by "@youruser:matrix.org"
 ```
 
 Hinweis:

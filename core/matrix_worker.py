@@ -672,8 +672,8 @@ def load_config_from_env() -> MatrixWorkerConfig:
         repos_root=os.getenv("DEVAGENT_REPOS_ROOT", "/srv/repos"),
         claude_bin=os.getenv("DEVAGENT_CLAUDE_BIN", "claude"),
         ai_timeout_seconds=int(os.getenv("DEVAGENT_AI_TIMEOUT_SECONDS", "120")),
-        relogin_user=os.getenv("MATRIX_USER_DEVAGENT") or os.getenv("MATRIX_USER_OPERATOR", ""),
-        relogin_password=os.getenv("MATRIX_PASSWORD_DEVAGENT") or os.getenv("MATRIX_PASSWORD_OPERATOR", ""),
+        relogin_user=os.getenv("MATRIX_USER_DEVAGENT", ""),
+        relogin_password=os.getenv("MATRIX_PASSWORD_DEVAGENT", ""),
         relogin_env_file=os.getenv("DEVAGENT_ENV_FILE", "/srv/devagent/.env"),
     )
 

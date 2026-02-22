@@ -2,7 +2,7 @@
 # deploy.sh — Sync dev tree → /srv/devagent and restart services
 set -euo pipefail
 
-SRC="/home/spro/development/VibedDevAgent"
+SRC="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 DST="/srv/devagent"
 
 echo "==> Deploying $SRC → $DST"

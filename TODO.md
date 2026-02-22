@@ -139,7 +139,7 @@ touch docs/reliability.md
 ## P1-SECURITY -- Service-User Härtung (HOHE PRIORITÄT)
 
 ### 14) Option C: devagent-User vollständig einrichten ⚠️ HOHE PRIO
-**Hintergrund:** Aktuell läuft der Service als `spro` (temporäre Lösung, Option A).
+**Hintergrund:** Aktuell läuft der Service als der Operator-User (temporäre Lösung, Option A).
 Das ist für Entwicklung ok, aber nicht für produktiven Betrieb.
 
 - [ ] `devagent`-User mit Login-Shell ausstatten: `sudo usermod -s /bin/bash devagent`
@@ -151,7 +151,7 @@ Das ist für Entwicklung ok, aber nicht für produktiven Betrieb.
 - [ ] Log-Verzeichnis `/var/log/devagent/` Ownership auf `devagent` korrigieren
 - [ ] Testen: `sudo -u devagent claude --version`
 
-**Warum wichtig:** Solange der Service als `spro` läuft, hat ein bösartiger Job-Command
+**Warum wichtig:** Solange der Service als Operator-User läuft, hat ein bösartiger Job-Command
 Zugriff auf SSH-Keys, Browser-Profile und alle anderen Projekte des Users.
 
 ### 15) Option E: Direkte Anthropic API (mittelfristige Alternative)

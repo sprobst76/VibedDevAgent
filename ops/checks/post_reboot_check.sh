@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SERVICE="${1:-devagent}"
-ALLOWED_USER="${2:-@alice:example.org}"
+ALLOWED_USER="${2:-@operator:example.org}"
 ARTIFACTS_ROOT="${DEVAGENT_ARTIFACTS_ROOT:-/srv/agent-artifacts}"
 JOB_ID="reboot-$(date +%s)"
 

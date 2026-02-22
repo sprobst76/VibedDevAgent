@@ -5,13 +5,15 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# TEMPORARY: running as spro for claude CLI access (Option A).
-# TODO: switch back to devagent once Option C is implemented (see TODO.md #14).
-User=spro
+# TEMPORARY: running as the operator user for claude CLI access (Option A).
+# TODO: switch to a dedicated service user once Option C is implemented (see TODO.md #14).
+# Replace YOUR_USERNAME with the actual OS user running this service.
+User=YOUR_USERNAME
 WorkingDirectory=/srv/devagent
 EnvironmentFile=/srv/devagent/.env
 Environment=PYTHONUNBUFFERED=1
-Environment=PATH=/home/spro/.local/bin:/home/spro/.nvm/versions/node/v24.11.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Adjust PATH to include the user's local bin and node (nvm) directories.
+Environment=PATH=/home/YOUR_USERNAME/.local/bin:/home/YOUR_USERNAME/.nvm/versions/node/current/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/env bash -lc 'python3 -m core.matrix_worker'
 Restart=on-failure
 RestartSec=3
@@ -22,7 +24,8 @@ StandardError=append:/var/log/devagent/core.log
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
-ReadWritePaths=/srv/devagent /var/log/devagent /home/spro/development /srv/repos /srv/agent-artifacts /tmp
+# Adjust ReadWritePaths to include the operator's development directory.
+ReadWritePaths=/srv/devagent /var/log/devagent /home/YOUR_USERNAME/development /srv/repos /srv/agent-artifacts /tmp
 ProtectHome=read-only
 ProtectKernelTunables=yes
 ProtectKernelModules=yes

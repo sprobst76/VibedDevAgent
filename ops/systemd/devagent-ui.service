@@ -5,15 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Replace YOUR_USERNAME and /home/YOUR_USERNAME/development/VibedDevAgent with
-# the actual OS user and checkout path on your server.
-User=YOUR_USERNAME
-WorkingDirectory=/srv/devagent
+User=spro
+WorkingDirectory=/home/spro/development/VibedDevAgent
 EnvironmentFile=/srv/devagent/.env
 Environment=PYTHONUNBUFFERED=1
-Environment=DEVAGENT_DEVELOPMENT_ROOT=/home/YOUR_USERNAME/development
+Environment=DEVAGENT_DEVELOPMENT_ROOT=/home/spro/development
 Environment=DEVAGENT_PROJECTS_FILE=/srv/devagent/state/projects.json
-ExecStart=/home/YOUR_USERNAME/development/VibedDevAgent/.venv/bin/uvicorn ui.server:app --host 0.0.0.0 --port 20042 --app-dir /home/YOUR_USERNAME/development/VibedDevAgent
+ExecStart=/home/spro/development/VibedDevAgent/.venv/bin/uvicorn ui.server:app --host 0.0.0.0 --port 20042 --app-dir /home/spro/development/VibedDevAgent
 Restart=on-failure
 RestartSec=3
 StandardOutput=append:/var/log/devagent/ui.log
@@ -23,8 +21,7 @@ StandardError=append:/var/log/devagent/ui.log
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
-# Adjust ReadWritePaths to include the operator's development directory.
-ReadWritePaths=/srv/devagent /var/log/devagent /home/YOUR_USERNAME/development /srv/repos /srv/agent-artifacts /tmp
+ReadWritePaths=/srv/devagent /var/log/devagent /home/spro/development /srv/repos /srv/agent-artifacts /tmp
 ProtectHome=read-only
 ProtectKernelTunables=yes
 ProtectKernelModules=yes

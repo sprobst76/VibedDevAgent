@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import urllib.error
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 from adapters.matrix.client import MatrixApiError, MatrixAuthError, MatrixClient
 

@@ -12,13 +12,13 @@ import time
 import threading
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from adapters.matrix.ai_handler import parse_ai_message, run_ai_task
-from adapters.matrix.client import MatrixApiError, MatrixAuthError, MatrixClient
+from adapters.matrix.client import MatrixApiError, MatrixClient
 from adapters.matrix.listener import MatrixListenerConfig, MatrixRoomListener
 from core.engine import DevAgentEngine
 from core.job_service import JobService

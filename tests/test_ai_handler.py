@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import threading
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from adapters.matrix.ai_handler import MAX_OUTPUT_CHARS, AiTaskResult, parse_ai_message, run_ai_task
+from adapters.matrix.ai_handler import MAX_OUTPUT_CHARS, parse_ai_message, run_ai_task
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

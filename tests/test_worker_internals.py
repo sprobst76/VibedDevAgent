@@ -7,7 +7,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from adapters.matrix.client import MatrixSyncResult
 from core.engine import DevAgentEngine
@@ -16,7 +16,6 @@ from core.matrix_worker import (
     MatrixWorker,
     MatrixWorkerConfig,
     MatrixWorkerState,
-    build_worker,
     load_config_from_env,
 )
 from runner.job_runner import JobRunHandle

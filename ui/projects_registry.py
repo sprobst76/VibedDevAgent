@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from core.path_guard import validate_project_name, validate_project_path, PathGuardError  # noqa: F401 (re-export)

@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from adapters.matrix.client import MatrixClient
+from adapters.matrix.client import MatrixClient  # noqa: E402
 
 
 def _ts_ms_to_iso(ts: int | None) -> str:

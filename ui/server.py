@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import hmac
 import json
 import os
@@ -15,7 +14,7 @@ from typing import Annotated
 
 import socket
 
-from fastapi import FastAPI, Form, Request, Response
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
@@ -174,7 +173,7 @@ def _get_recent_jobs(limit: int = 10) -> list[dict]:
         audit = job_dir / "audit.jsonl"
         if not audit.exists():
             continue
-        lines = [l for l in audit.read_text(encoding="utf-8").splitlines() if l.strip()]
+        lines = [line for line in audit.read_text(encoding="utf-8").splitlines() if line.strip()]
         if not lines:
             continue
         last = json.loads(lines[-1])
@@ -244,8 +243,8 @@ async def add_project(
         room_label = room_name.strip() or f"DevAgent · {name}"
         try:
             room_id = _create_matrix_room(name, room_label)
-        except Exception as exc:
-            return HTMLResponse(f"<p class='text-red-600 text-sm'>Matrix-Fehler beim Erstellen des Raums. Details im Log.</p>")
+        except Exception:
+            return HTMLResponse("<p class='text-red-600 text-sm'>Matrix-Fehler beim Erstellen des Raums. Details im Log.</p>")
     elif room_action == "existing":
         room_id    = existing_room_id.strip()
         room_label = room_name.strip() or room_id

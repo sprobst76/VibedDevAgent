@@ -54,7 +54,7 @@ class AuditTests(unittest.TestCase):
                 )
             lines = (Path(tmp) / "job-j2" / "audit.jsonl").read_text(encoding="utf-8").strip().splitlines()
             self.assertEqual(len(lines), 3)
-            actions = [json.loads(l)["action"] for l in lines]
+            actions = [json.loads(line)["action"] for line in lines]
             self.assertEqual(actions, ["approve", "runner_start", "runner_stop"])
 
     def test_extra_field_included_when_provided(self) -> None:

@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from adapters.matrix.client import MatrixApiError, MatrixClient
+from adapters.matrix.client import MatrixApiError, MatrixClient  # noqa: E402
 
 
 def _safe_state(client: MatrixClient, room_id: str, event_type: str) -> dict[str, object]:

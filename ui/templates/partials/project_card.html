@@ -1,55 +1,50 @@
-<div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
+<div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-2.5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
 
   <!-- Header -->
   <div class="flex items-start justify-between gap-2">
     <div class="min-w-0">
-      <h2 class="font-semibold text-sm truncate">{{ p.name }}</h2>
+      <h2 class="font-semibold text-sm">{{ p.name }}</h2>
       <p class="text-xs text-slate-400 font-mono mt-0.5 truncate">{{ p.local_path }}</p>
     </div>
     {% if p.initialized %}
-      <span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 font-medium shrink-0">Matrix ✓</span>
+      <span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 font-medium shrink-0">✓ Matrix</span>
     {% else %}
       <span class="text-xs bg-amber-50 text-amber-600 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium shrink-0">kein Raum</span>
     {% endif %}
   </div>
 
   {% if p.initialized %}
-    <!-- Matrix room info -->
-    <div class="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 font-mono truncate">
-      {{ p.matrix_room_id }}
-    </div>
+  <div class="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-1.5 font-mono truncate border border-slate-100">
+    {{ p.matrix_room_name or p.matrix_room_id }}
+  </div>
   {% endif %}
 
   <!-- Actions -->
   <div class="flex flex-wrap gap-1.5 mt-auto">
 
-    <!-- Detail -->
     <button hx-get="/projects/{{ p.name }}"
             hx-target="#side-panel"
             hx-swap="innerHTML"
-            class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-1.5 transition-colors">
+            class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-1.5 transition-colors font-medium">
       Details
     </button>
 
     {% if p.initialized %}
-      <!-- tmux -->
       <button hx-post="/projects/{{ p.name }}/tmux"
               hx-target="#tmux-{{ p.name }}"
               hx-swap="innerHTML"
-              class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-1.5 transition-colors">
+              class="text-xs bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-1.5 transition-colors font-medium">
         tmux
       </button>
     {% else %}
-      <!-- Open room form -->
       <button hx-get="/projects/{{ p.name }}/room-form"
               hx-target="#room-form-{{ p.name }}"
               hx-swap="innerHTML"
-              class="text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 transition-colors">
-        Matrix-Raum verknüpfen
+              class="text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium">
+        + Matrix verknüpfen
       </button>
     {% endif %}
 
-    <!-- Remove -->
     <button hx-delete="/projects/{{ p.name }}"
             hx-target="#project-list"
             hx-swap="innerHTML"

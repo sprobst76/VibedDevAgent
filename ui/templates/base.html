@@ -10,33 +10,52 @@
     [x-cloak] { display: none !important; }
     .htmx-indicator { opacity: 0; transition: opacity 150ms; }
     .htmx-request .htmx-indicator { opacity: 1; }
+    .nav-active { color: #fff !important; background-color: rgba(255,255,255,0.15); border-radius: 6px; }
   </style>
 </head>
 <body class="min-h-full bg-slate-50 text-slate-800 font-sans">
 
   <!-- Navbar -->
-  <nav class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4">
-    <span class="text-lg font-bold tracking-tight text-emerald-700">DevAgent</span>
-    <span class="text-slate-300">|</span>
-    <a href="/" class="text-sm text-slate-600 hover:text-emerald-700 transition-colors">Projekte</a>
-    <a href="/logs" class="text-sm text-slate-600 hover:text-emerald-700 transition-colors">Logs</a>
-    <div class="ml-auto flex items-center gap-3">
-      <!-- Worker status indicator — auto-refresh every 30s -->
+  <nav class="bg-slate-800 border-b border-slate-700 px-6 py-0 flex items-center gap-1">
+    <a href="/" class="text-base font-bold tracking-tight text-white py-3 pr-4 mr-2">
+      DevAgent
+    </a>
+
+    {% set path = request.url.path %}
+    <a href="/"
+       class="text-sm text-slate-300 hover:text-white px-3 py-3 transition-colors {% if path == '/' %}nav-active{% endif %}">
+      Projekte
+    </a>
+    <a href="/jobs"
+       class="text-sm text-slate-300 hover:text-white px-3 py-3 transition-colors {% if path.startswith('/jobs') %}nav-active{% endif %}">
+      Jobs
+      <span id="nav-running-badge"
+            hx-get="/api/stats"
+            hx-trigger="load, every 30s"
+            hx-swap="outerHTML"
+            hx-select="#nav-running-badge"></span>
+    </a>
+    <a href="/logs"
+       class="text-sm text-slate-300 hover:text-white px-3 py-3 transition-colors {% if path == '/logs' %}nav-active{% endif %}">
+      Logs
+    </a>
+
+    <div class="ml-auto flex items-center gap-3 py-3">
+      <!-- Worker status -->
       <div id="worker-status"
            hx-get="/api/worker/status"
            hx-trigger="load, every 30s"
            hx-swap="innerHTML">
-        <span class="text-xs text-slate-400">…</span>
+        <span class="text-xs text-slate-500">…</span>
       </div>
-      <span class="text-xs text-slate-400 font-mono">v0.1</span>
+      <span class="text-xs text-slate-500 font-mono">v0.1</span>
       <form method="post" action="/logout" class="inline">
-        <button type="submit" class="text-xs text-slate-400 hover:text-red-500 transition-colors">Abmelden</button>
+        <button type="submit" class="text-xs text-slate-400 hover:text-red-400 transition-colors">Abmelden</button>
       </form>
     </div>
   </nav>
 
-
-  <main class="max-w-5xl mx-auto px-4 py-8">
+  <main class="max-w-6xl mx-auto px-4 py-6">
     {% block content %}{% endblock %}
   </main>
 

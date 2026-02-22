@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}DevAgent — Jobs{% endblock %}
+
+{% block content %}
+<div class="flex gap-6 items-start">
+
+  <!-- Left: job table -->
+  <div class="flex-1 min-w-0 space-y-4">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <h1 class="text-xl font-bold tracking-tight">Jobs</h1>
+      <div class="flex gap-2 text-xs">
+        <button onclick="filterJobs('')"       id="tab-all"     class="tab-btn tab-active px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium">Alle</button>
+        <button onclick="filterJobs('RUNNING')" id="tab-running" class="tab-btn px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-500">Laufend</button>
+        <button onclick="filterJobs('DONE')"    id="tab-done"    class="tab-btn px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-500">Erledigt</button>
+        <button onclick="filterJobs('FAILED')"  id="tab-failed"  class="tab-btn px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-500">Fehlschlag</button>
+      </div>
+    </div>
+
+    {% if jobs %}
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <table class="w-full text-sm border-collapse" id="jobs-table">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr class="text-left text-slate-500 text-xs font-semibold uppercase tracking-wide">
+            <th class="px-4 py-3">Job-ID</th>
+            <th class="px-4 py-3">Projekt</th>
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3">Gestartet</th>
+            <th class="px-4 py-3">Zuletzt</th>
+            <th class="px-4 py-3">Von</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for job in jobs %}
+          <tr class="job-row hover:bg-slate-50 cursor-pointer transition-colors"
+              data-state="{{ job.state }}"
+              hx-get="/jobs/{{ job.job_id }}"
+              hx-target="#job-detail"
+              hx-swap="innerHTML"
+              onclick="setActiveRow(this)">
+            <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ job.short_id }}…</td>
+            <td class="px-4 py-3 font-medium text-slate-700">{{ job.project or '—' }}</td>
+            <td class="px-4 py-3">
+              {% if job.state == 'RUNNING' %}
+                <span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>RUNNING
+                </span>
+              {% elif job.state == 'DONE' %}
+                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-medium">✓ DONE</span>
+              {% elif job.state == 'FAILED' %}
+                <span class="bg-red-50 text-red-600 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-medium">✗ FAILED</span>
+              {% elif job.state == 'CANCELLED' %}
+                <span class="bg-slate-100 text-slate-500 border border-slate-200 rounded-full px-2.5 py-0.5 text-xs font-medium">🛑 CANCELLED</span>
+              {% elif job.state == 'WAIT_APPROVAL' %}
+                <span class="bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 text-xs font-medium">⏳ WARTEN</span>
+              {% else %}
+                <span class="bg-slate-100 text-slate-500 rounded-full px-2.5 py-0.5 text-xs font-medium">{{ job.state }}</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-slate-400 text-xs font-mono">{{ job.created_at[:16] if job.created_at else '—' }}</td>
+            <td class="px-4 py-3 text-slate-400 text-xs font-mono">{{ job.updated_at[:16] if job.updated_at else '—' }}</td>
+            <td class="px-4 py-3 text-slate-400 text-xs truncate max-w-[140px]">{{ job.requested_by or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400 shadow-sm">
+      <p class="text-4xl mb-3">📋</p>
+      <p class="font-medium">Noch keine Jobs vorhanden</p>
+      <p class="text-sm mt-1">Jobs erscheinen hier sobald Jobcards genehmigt wurden.</p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right: job detail panel -->
+  <div id="job-detail" class="w-[440px] shrink-0 sticky top-6 space-y-0">
+    <div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-400 shadow-sm">
+      <p class="text-3xl mb-2">🔍</p>
+      <p class="text-sm">Job auswählen für Details</p>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  .tab-active { background-color: #1e293b !important; color: white !important; border-color: #1e293b !important; }
+  .job-row-active { background-color: #eff6ff !important; }
+</style>
+
+<script>
+function filterJobs(state) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+  const map = { '': 'tab-all', 'RUNNING': 'tab-running', 'DONE': 'tab-done', 'FAILED': 'tab-failed' };
+  const btn = document.getElementById(map[state] || 'tab-all');
+  if (btn) btn.classList.add('tab-active');
+
+  document.querySelectorAll('.job-row').forEach(row => {
+    if (!state || row.dataset.state === state) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+function setActiveRow(el) {
+  document.querySelectorAll('.job-row').forEach(r => r.classList.remove('job-row-active'));
+  el.classList.add('job-row-active');
+}
+</script>
+{% endblock %}

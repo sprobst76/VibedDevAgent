@@ -6,6 +6,7 @@ import asyncio
 import hmac
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -164,28 +165,51 @@ def _create_matrix_room(name: str, display_name: str) -> str:
     return room_id
 
 
-def _get_recent_jobs(limit: int = 10) -> list[dict]:
+def _get_recent_jobs(limit: int = 20) -> list[dict]:
     root = Path(ARTIFACTS_ROOT)
     jobs = []
     if not root.exists():
         return jobs
-    for job_dir in sorted(root.glob("job-*"), reverse=True)[:30]:
+    for job_dir in sorted(root.glob("job-*"), reverse=True)[:50]:
         audit = job_dir / "audit.jsonl"
         if not audit.exists():
             continue
         lines = [line for line in audit.read_text(encoding="utf-8").splitlines() if line.strip()]
         if not lines:
             continue
-        last = json.loads(lines[-1])
+        first = json.loads(lines[0])
+        last  = json.loads(lines[-1])
+        job_id = last.get("job_id", "")
         jobs.append({
-            "job_id":    last.get("job_id", ""),
-            "state":     last.get("state_after", "?"),
-            "action":    last.get("action", ""),
-            "timestamp": last.get("timestamp", ""),
+            "job_id":       job_id,
+            "short_id":     job_id[:8] if len(job_id) > 8 else job_id,
+            "state":        last.get("state_after", "?"),
+            "action":       last.get("action", ""),
+            "project":      first.get("extra", {}).get("repo", ""),
+            "requested_by": first.get("user_id", ""),
+            "created_at":   first.get("timestamp", ""),
+            "updated_at":   last.get("timestamp", ""),
         })
         if len(jobs) >= limit:
             break
     return jobs
+
+
+def _get_job_audit(job_id: str) -> list[dict]:
+    """Return the full audit trail for a single job."""
+    audit = Path(ARTIFACTS_ROOT) / f"job-{job_id}" / "audit.jsonl"
+    if not audit.exists():
+        return []
+    lines = [line for line in audit.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [json.loads(line) for line in lines]
+
+
+_JOB_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
+
+
+def _valid_job_id(job_id: str) -> bool:
+    """Guard against path traversal: only allow safe characters in job_id."""
+    return bool(job_id and len(job_id) <= 128 and _JOB_ID_RE.match(job_id))
 
 
 # ── Routes: Pages ─────────────────────────────────────────────────────────────
@@ -531,6 +555,160 @@ async def api_worker_status(request: Request, format: str = "json"):
 
     if error:
         return JSONResponse({"running": False, "error": error})
+    return JSONResponse(data)
+
+
+# ── Routes: Jobs ──────────────────────────────────────────────────────────────
+
+@app.get("/jobs", response_class=HTMLResponse)
+async def jobs_page(request: Request):
+    jobs = _get_recent_jobs(limit=50)
+    return templates.TemplateResponse("jobs.html", {"request": request, "jobs": jobs})
+
+
+@app.get("/jobs/{job_id}", response_class=HTMLResponse)
+async def job_detail_partial(request: Request, job_id: str):
+    if not _valid_job_id(job_id):
+        return HTMLResponse("<p class='text-red-500 text-sm'>Ungültige Job-ID.</p>", status_code=400)
+    audit = _get_job_audit(job_id)
+    runner_log = Path(ARTIFACTS_ROOT) / f"job-{job_id}" / "runner.log"
+    state = audit[-1].get("state_after", "?") if audit else "?"
+    return templates.TemplateResponse("partials/job_detail.html", {
+        "request":    request,
+        "job_id":     job_id,
+        "audit":      audit,
+        "state":      state,
+        "has_log":    runner_log.exists(),
+    })
+
+
+# ── JSON API: Job detail ───────────────────────────────────────────────────────
+
+@app.get("/api/jobs/{job_id}/audit")
+async def api_job_audit(job_id: str):
+    if not _valid_job_id(job_id):
+        return JSONResponse({"error": "invalid job_id"}, status_code=400)
+    return JSONResponse(_get_job_audit(job_id))
+
+
+@app.get("/api/jobs/{job_id}/log/stream")
+async def job_log_stream(job_id: str, follow: bool = True):
+    """SSE endpoint: tail the runner.log for a specific job."""
+    if not _valid_job_id(job_id):
+        async def _err():
+            yield "data: [Ungültige Job-ID]\n\n"
+        return StreamingResponse(_err(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache"})
+
+    log_path = Path(ARTIFACTS_ROOT) / f"job-{job_id}" / "runner.log"
+
+    async def generate():
+        if not log_path.exists():
+            yield f"data: [runner.log nicht gefunden für Job {job_id}]\n\n"
+            return
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as f:
+                size = log_path.stat().st_size
+                f.seek(max(0, size - 32768))
+                if size > 32768:
+                    f.readline()  # discard partial first line
+                while True:
+                    line = f.readline()
+                    if line:
+                        yield f"data: {line.rstrip()}\n\n"
+                    elif follow:
+                        await asyncio.sleep(0.5)
+                    else:
+                        break
+        except Exception as exc:
+            yield f"data: [Fehler beim Lesen: {exc}]\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── JSON API: Stats ────────────────────────────────────────────────────────────
+
+@app.get("/partials/stats", response_class=HTMLResponse)
+async def stats_partial(request: Request):
+    """HTMX partial: dashboard stat cards."""
+    jobs = _get_recent_jobs(limit=200)
+    running = sum(1 for j in jobs if j["state"] == "RUNNING")
+    projects_count = len(_registry().projects)
+    last_job_at = jobs[0]["updated_at"][:16] if jobs else "—"
+
+    # Worker status
+    status_path = Path(REGISTRY_FILE).parent / "worker_status.json"
+    worker_ok = False
+    if status_path.exists():
+        try:
+            data = json.loads(status_path.read_text(encoding="utf-8"))
+            updated_at = datetime.fromisoformat(data["updated_at"])
+            age = int((datetime.now(timezone.utc) - updated_at).total_seconds())
+            worker_ok = age < 600
+        except Exception:
+            pass
+
+    worker_dot = "bg-emerald-500" if worker_ok else "bg-red-400"
+    worker_label = "aktiv" if worker_ok else "offline"
+
+    cards = [
+        ("Projekte", str(projects_count), "text-slate-700", "bg-slate-50", "border-slate-200"),
+        ("Laufend", str(running), "text-blue-700" if running else "text-slate-700",
+         "bg-blue-50" if running else "bg-slate-50",
+         "border-blue-200" if running else "border-slate-200"),
+        ("Jobs gesamt", str(len(jobs)), "text-slate-700", "bg-slate-50", "border-slate-200"),
+        ("Letzter Job", last_job_at, "text-slate-600", "bg-slate-50", "border-slate-200"),
+    ]
+
+    html = '<div class="grid grid-cols-2 sm:grid-cols-5 gap-3">'
+    for label, value, text_cls, bg_cls, border_cls in cards:
+        html += (
+            f'<div class="{bg_cls} border {border_cls} rounded-xl p-4">'
+            f'<p class="text-xs text-slate-400 font-medium">{label}</p>'
+            f'<p class="text-xl font-bold {text_cls} mt-1 truncate">{value}</p>'
+            f'</div>'
+        )
+    # Worker status card
+    html += (
+        f'<div class="bg-white border border-slate-200 rounded-xl p-4">'
+        f'<p class="text-xs text-slate-400 font-medium">Worker</p>'
+        f'<div class="flex items-center gap-2 mt-1">'
+        f'<span class="w-2.5 h-2.5 rounded-full {worker_dot} inline-block shrink-0"></span>'
+        f'<span class="text-sm font-semibold text-slate-700">{worker_label}</span>'
+        f'</div>'
+        f'</div>'
+    )
+    html += '</div>'
+    return HTMLResponse(html)
+
+
+@app.get("/api/stats")
+async def api_stats(request: Request):
+    """Return summary statistics for the dashboard (JSON or HTMX HTML fragment)."""
+    jobs = _get_recent_jobs(limit=200)
+    running = sum(1 for j in jobs if j["state"] == "RUNNING")
+    last_job_at = jobs[0]["updated_at"] if jobs else None
+    data = {
+        "total_jobs":     len(jobs),
+        "running_jobs":   running,
+        "projects_count": len(_registry().projects),
+        "last_job_at":    last_job_at,
+    }
+    if request.headers.get("HX-Request"):
+        # Return only the running-badge fragment for the navbar
+        badge = (
+            f' <span class="ml-1 bg-blue-500 text-white text-[10px] font-bold'
+            f' rounded-full px-1.5 py-0.5 align-middle">{running}</span>'
+        ) if running else ""
+        return HTMLResponse(
+            f'<span id="nav-running-badge"'
+            f' hx-get="/api/stats" hx-trigger="every 30s"'
+            f' hx-swap="outerHTML" hx-select="#nav-running-badge">{badge}</span>'
+        )
     return JSONResponse(data)
 
 

@@ -4,21 +4,31 @@
 {% block content %}
 <div class="space-y-6">
 
+  <!-- Dashboard stat cards -->
+  <div id="stat-cards"
+       hx-get="/partials/stats"
+       hx-trigger="load, every 60s"
+       hx-swap="innerHTML">
+    <!-- filled by HTMX below -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-pulse">
+      {% for _ in range(4) %}
+      <div class="bg-white border border-slate-200 rounded-xl p-4 h-16"></div>
+      {% endfor %}
+    </div>
+  </div>
+
   <!-- Header -->
   <div class="flex items-center justify-between flex-wrap gap-3">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight">Projekte</h1>
-      <p class="text-sm text-slate-400 mt-1">Manuell verwaltete DevAgent-Projekte</p>
+      <h1 class="text-xl font-bold tracking-tight">Projekte</h1>
     </div>
     <div class="flex gap-2">
-      <!-- Import aus ~/development -->
       <button hx-get="/import"
               hx-target="#side-panel"
               hx-swap="innerHTML"
               class="text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-4 py-2 transition-colors shadow-sm">
         📂 Aus ~/development importieren
       </button>
-      <!-- Manuell hinzufügen -->
       <button hx-get="/projects/add-form"
               hx-target="#side-panel"
               hx-swap="innerHTML"
@@ -30,17 +40,22 @@
 
   <!-- Two-column: list + side panel -->
   <div class="flex gap-6 items-start">
-
-    <!-- Project list -->
     <div class="flex-1 min-w-0 space-y-3">
       <div id="project-list">
         {% include "partials/project_list.html" %}
       </div>
     </div>
-
-    <!-- Side panel: add form / import / detail -->
     <div id="side-panel" class="w-96 shrink-0 sticky top-6"></div>
-
   </div>
+
 </div>
+
+<script>
+// After stats load, replace the placeholder with real cards
+document.body.addEventListener("htmx:afterSwap", function(e) {
+  if (e.detail.target && e.detail.target.id === "stat-cards") {
+    // already replaced by server response
+  }
+});
+</script>
 {% endblock %}

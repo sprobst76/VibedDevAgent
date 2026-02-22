@@ -2,61 +2,105 @@
 {% block title %}DevAgent — Live Log{% endblock %}
 
 {% block content %}
-<div class="space-y-4">
+<div class="space-y-3">
 
   <div class="flex items-center justify-between flex-wrap gap-3">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight">Live Log</h1>
-      <p class="text-xs text-slate-400 font-mono mt-1">{{ log_file }}</p>
+      <h1 class="text-xl font-bold tracking-tight">Live Log</h1>
+      <p class="text-xs text-slate-400 font-mono mt-0.5">{{ log_file }}</p>
     </div>
-    <div class="flex gap-2 items-center">
+    <div class="flex gap-2 items-center flex-wrap">
       <span id="sse-status" class="text-xs text-slate-400">Verbinde…</span>
-      <button onclick="document.getElementById('log-output').textContent = ''"
-              class="text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+      <!-- Filter input -->
+      <input id="log-filter" type="text" placeholder="Filter…"
+             oninput="applyFilter()"
+             class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 w-40 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white">
+      <!-- Timestamp toggle -->
+      <button id="ts-toggle" onclick="toggleTimestamps()"
+              class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+        Timestamps
+      </button>
+      <button onclick="clearLog()"
+              class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
         Leeren
       </button>
       <button id="scroll-toggle" onclick="toggleAutoScroll()"
-              class="text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
+              class="text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg px-3 py-1.5 transition-colors shadow-sm">
         Auto-Scroll: Ein
       </button>
     </div>
   </div>
 
-  <pre id="log-output"
-       class="bg-slate-900 text-emerald-300 text-xs font-mono p-4 rounded-lg h-[72vh] overflow-auto whitespace-pre-wrap break-words"></pre>
+  <div id="log-container"
+       class="bg-slate-900 rounded-xl overflow-auto h-[74vh] p-4 space-y-0">
+    <!-- lines rendered as spans inside pre -->
+    <pre id="log-output" class="text-xs font-mono whitespace-pre-wrap break-words min-h-full"></pre>
+  </div>
 
 </div>
 
 <script>
-  const pre    = document.getElementById('log-output');
-  const status = document.getElementById('sse-status');
-  const btn    = document.getElementById('scroll-toggle');
-  let autoScroll = true;
+  const container  = document.getElementById('log-container');
+  const pre        = document.getElementById('log-output');
+  const statusEl   = document.getElementById('sse-status');
+  const filterEl   = document.getElementById('log-filter');
+  let autoScroll   = true;
+  let showTs       = true;
+  let allLines     = [];    // raw lines buffer
+  const MAX_LINES  = 2000;
 
-  function toggleAutoScroll() {
-    autoScroll = !autoScroll;
-    btn.textContent = 'Auto-Scroll: ' + (autoScroll ? 'Ein' : 'Aus');
+  // Level detection
+  function levelClass(line) {
+    if (/\bERROR\b|\bCRITICAL\b/.test(line)) return 'text-red-400';
+    if (/\bWARNING\b|\bWARN\b/.test(line))  return 'text-amber-400';
+    if (/\bDEBUG\b/.test(line))             return 'text-slate-500';
+    return 'text-emerald-300';
+  }
+
+  function stripTimestamp(line) {
+    return line.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[,\.]?\d*\s+/, '');
+  }
+
+  function renderLines() {
+    const filter = filterEl.value.toLowerCase();
+    const frag   = [];
+    for (const raw of allLines) {
+      if (filter && !raw.toLowerCase().includes(filter)) continue;
+      const display = showTs ? raw : stripTimestamp(raw);
+      frag.push(`<span class="${levelClass(raw)}">${escapeHtml(display)}\n</span>`);
+    }
+    pre.innerHTML = frag.join('');
+    if (autoScroll) container.scrollTop = container.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function appendLine(text) {
-    pre.textContent += text + '\n';
-    if (autoScroll) pre.scrollTop = pre.scrollHeight;
+    allLines.push(text);
+    if (allLines.length > MAX_LINES) allLines.splice(0, allLines.length - MAX_LINES);
+    renderLines();
+  }
+
+  function applyFilter()     { renderLines(); }
+  function toggleTimestamps(){ showTs = !showTs; renderLines(); }
+  function clearLog()        { allLines = []; pre.innerHTML = ''; }
+  function toggleAutoScroll(){
+    autoScroll = !autoScroll;
+    document.getElementById('scroll-toggle').textContent = 'Auto-Scroll: ' + (autoScroll ? 'Ein' : 'Aus');
   }
 
   const es = new EventSource('/api/logs/stream');
 
-  es.onopen = function () {
-    status.textContent = '● Verbunden';
-    status.className = 'text-xs text-emerald-500';
+  es.onopen = function() {
+    statusEl.textContent = '● Verbunden';
+    statusEl.className = 'text-xs text-emerald-500';
   };
-
-  es.onmessage = function (e) {
-    appendLine(e.data);
-  };
-
-  es.onerror = function () {
-    status.textContent = '○ Getrennt — reconnecting…';
-    status.className = 'text-xs text-red-400';
+  es.onmessage = function(e) { appendLine(e.data); };
+  es.onerror = function() {
+    statusEl.textContent = '○ Getrennt — reconnecting…';
+    statusEl.className = 'text-xs text-red-400';
   };
 </script>
 {% endblock %}

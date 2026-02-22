@@ -1,0 +1,162 @@
+<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+    <div>
+      <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Job</p>
+      <p class="font-mono text-sm text-slate-700 break-all">{{ job_id }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+      {% if state == 'RUNNING' %}
+        <span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>RUNNING
+        </span>
+      {% elif state == 'DONE' %}
+        <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-medium">✓ DONE</span>
+      {% elif state == 'FAILED' %}
+        <span class="bg-red-50 text-red-600 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-medium">✗ FAILED</span>
+      {% elif state == 'CANCELLED' %}
+        <span class="bg-slate-100 text-slate-500 border border-slate-200 rounded-full px-2.5 py-0.5 text-xs font-medium">🛑 CANCELLED</span>
+      {% else %}
+        <span class="bg-slate-100 text-slate-500 rounded-full px-2.5 py-0.5 text-xs font-medium">{{ state }}</span>
+      {% endif %}
+      <button onclick="document.getElementById('job-detail').innerHTML='<div class=\'bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-400 shadow-sm\'><p class=\'text-3xl mb-2\'>🔍</p><p class=\'text-sm\'>Job auswählen für Details</p></div>'"
+              class="text-xs text-slate-400 hover:text-slate-600 transition-colors">✕</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="border-b border-slate-100">
+    <div class="flex px-5">
+      <button onclick="showTab('audit')" id="tab-audit-btn"
+              class="text-xs font-medium py-3 px-1 mr-5 border-b-2 border-slate-800 text-slate-800 transition-colors">
+        Audit-Trail
+      </button>
+      <button onclick="showTab('log')" id="tab-log-btn"
+              class="text-xs font-medium py-3 px-1 mr-5 border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition-colors">
+        Log-Ausgabe
+      </button>
+    </div>
+  </div>
+
+  <!-- Audit tab -->
+  <div id="tab-audit" class="px-5 py-4 max-h-[60vh] overflow-y-auto space-y-2">
+    {% if audit %}
+      {% for event in audit %}
+      <div class="flex gap-3 text-xs">
+        <div class="flex flex-col items-center shrink-0">
+          <div class="w-2 h-2 rounded-full mt-1
+            {% if event.state_after in ['DONE'] %}bg-emerald-400
+            {% elif event.state_after in ['FAILED'] %}bg-red-400
+            {% elif event.state_after in ['RUNNING'] %}bg-blue-400
+            {% elif event.state_after in ['CANCELLED'] %}bg-slate-300
+            {% else %}bg-slate-200{% endif %}"></div>
+          {% if not loop.last %}
+          <div class="w-px flex-1 bg-slate-100 mt-1"></div>
+          {% endif %}
+        </div>
+        <div class="pb-3 min-w-0 flex-1">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-medium text-slate-700">{{ event.action }}</span>
+            <span class="text-slate-400 font-mono shrink-0">{{ event.timestamp[11:19] if event.timestamp else '—' }}</span>
+          </div>
+          <div class="flex items-center gap-2 mt-0.5">
+            {% if event.state_before and event.state_after and event.state_before != event.state_after %}
+            <span class="text-slate-400">{{ event.state_before }}</span>
+            <span class="text-slate-300">→</span>
+            <span class="font-medium
+              {% if event.state_after == 'DONE' %}text-emerald-600
+              {% elif event.state_after == 'FAILED' %}text-red-500
+              {% elif event.state_after == 'RUNNING' %}text-blue-600
+              {% else %}text-slate-600{% endif %}">{{ event.state_after }}</span>
+            {% endif %}
+            {% if event.allowed == false %}
+            <span class="text-red-400 ml-auto">✕ abgelehnt</span>
+            {% endif %}
+          </div>
+          {% if event.user_id %}
+          <p class="text-slate-400 mt-0.5 truncate">{{ event.user_id }}</p>
+          {% endif %}
+          {% if event.reason and event.reason not in ['ok', ''] %}
+          <p class="text-slate-400 mt-0.5 italic truncate">{{ event.reason }}</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-slate-400 py-4 text-center">Kein Audit-Trail vorhanden.</p>
+    {% endif %}
+  </div>
+
+  <!-- Log tab (hidden initially) -->
+  <div id="tab-log" class="hidden flex-col">
+    {% if has_log %}
+    <div class="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50">
+      <span id="log-sse-status" class="text-xs text-slate-400">Verbinde…</span>
+      <div class="flex gap-2">
+        <button onclick="clearJobLog()" class="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded border border-slate-200">Leeren</button>
+        <a href="/api/jobs/{{ job_id }}/log/stream?follow=false"
+           target="_blank"
+           class="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded border border-slate-200">
+          ⬇ Download
+        </a>
+      </div>
+    </div>
+    <pre id="job-log-output"
+         class="bg-slate-900 text-emerald-300 text-xs font-mono p-4 h-[45vh] overflow-auto whitespace-pre-wrap break-words"></pre>
+    {% else %}
+      <p class="text-slate-400 p-6 text-center text-sm">Noch keine Log-Datei vorhanden.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+(function() {
+  let logEs = null;
+  const jobId = {{ job_id | tojson }};
+
+  function showTab(name) {
+    ['audit','log'].forEach(t => {
+      document.getElementById('tab-' + t).style.display = 'none';
+      document.getElementById('tab-' + t + '-btn').className =
+        'text-xs font-medium py-3 px-1 mr-5 border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition-colors';
+    });
+    document.getElementById('tab-' + name).style.display = 'flex';
+    document.getElementById('tab-' + name + '-btn').className =
+      'text-xs font-medium py-3 px-1 mr-5 border-b-2 border-slate-800 text-slate-800 transition-colors';
+
+    if (name === 'log' && !logEs) {
+      startJobLog();
+    }
+  }
+
+  // Make showTab global so inline onclick can use it
+  window.showTab = showTab;
+  window.clearJobLog = function() {
+    const el = document.getElementById('job-log-output');
+    if (el) el.textContent = '';
+  };
+
+  function startJobLog() {
+    const pre    = document.getElementById('job-log-output');
+    const status = document.getElementById('log-sse-status');
+    if (!pre) return;
+
+    logEs = new EventSource('/api/jobs/' + jobId + '/log/stream');
+    logEs.onopen = function() {
+      if (status) { status.textContent = '● Verbunden'; status.className = 'text-xs text-emerald-500'; }
+    };
+    logEs.onmessage = function(e) {
+      pre.textContent += e.data + '\n';
+      pre.scrollTop = pre.scrollHeight;
+    };
+    logEs.onerror = function() {
+      if (status) { status.textContent = '○ Getrennt'; status.className = 'text-xs text-red-400'; }
+    };
+  }
+
+  // Show audit tab first
+  document.getElementById('tab-log').style.display = 'none';
+})();
+</script>

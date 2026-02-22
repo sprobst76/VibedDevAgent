@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -133,7 +134,15 @@ class MatrixClient:
                     updated.append(line)
             if not found:
                 updated.append(f"MATRIX_ACCESS_TOKEN={token}")
-            path.write_text("\n".join(updated) + "\n", encoding="utf-8")
+            new_content = "\n".join(updated) + "\n"
+            # Atomic write: write to temp file in same directory, then rename.
+            dir_ = path.parent
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=dir_, delete=False, suffix=".tmp"
+            ) as tmp:
+                tmp.write(new_content)
+                tmp_path = Path(tmp.name)
+            tmp_path.replace(path)
             log.info("updated MATRIX_ACCESS_TOKEN in %s", self._env_file)
         except Exception as exc:
             log.warning("could not persist token to %s: %s", self._env_file, exc)

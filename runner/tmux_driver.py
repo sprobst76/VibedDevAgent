@@ -45,7 +45,9 @@ class TmuxDriver:
         session = self.session_name(job_id)
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
 
-        wrapped = f"{command} 2>&1 | tee -a {shlex.quote(log_file)}"
+        # Wrap in a subshell so that the pipe doesn't swallow exit codes and
+        # the log_file path is safely shell-quoted against injection.
+        wrapped = f"( {command} ) 2>&1 | tee -a {shlex.quote(log_file)}"
         self._run_tmux("new-session", "-d", "-s", session, "-c", cwd, wrapped)
         return session
 

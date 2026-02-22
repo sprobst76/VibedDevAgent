@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from core.path_guard import validate_project_name, validate_project_path, PathGuardError  # noqa: F401 (re-export)
+
 
 @dataclass
 class Project:
@@ -42,7 +44,16 @@ class ProjectRegistry:
         payload = {"projects": {n: asdict(p) for n, p in self.projects.items()}}
         self._path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    def upsert(self, project: Project) -> None:
+    def upsert(self, project: Project, allowed_roots: list[str] | None = None) -> None:
+        """Persist a project after validating its name and path.
+
+        Raises PathGuardError if the name or path is unsafe.
+        *allowed_roots* restricts where project paths may live; pass an empty
+        list to skip path validation (e.g. during tests with artificial paths).
+        """
+        validate_project_name(project.name)
+        if allowed_roots is not None and len(allowed_roots) > 0:
+            project.local_path = validate_project_path(project.local_path, allowed_roots)
         self.projects[project.name] = project
         self.save()
 

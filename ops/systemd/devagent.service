@@ -18,5 +18,18 @@ RestartSec=3
 StandardOutput=append:/var/log/devagent/core.log
 StandardError=append:/var/log/devagent/core.log
 
+# ── Systemd security hardening ────────────────────────────────────────────────
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/devagent /var/log/devagent /home/spro/development /srv/repos /srv/agent-artifacts /tmp
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+
 [Install]
 WantedBy=multi-user.target

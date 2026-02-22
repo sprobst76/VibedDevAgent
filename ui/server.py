@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import subprocess
@@ -13,8 +15,8 @@ from typing import Annotated
 
 import socket
 
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi import FastAPI, Form, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -36,10 +38,85 @@ VERSION           = "0.1.0"
 BACKEND_ID        = socket.gethostname()
 _START_TIME       = datetime.now(timezone.utc)
 
+# ── Auth config ───────────────────────────────────────────────────────────────
+# If DEVAGENT_UI_API_KEY is empty the UI runs without authentication (dev mode).
+_UI_API_KEY      = os.getenv("DEVAGENT_UI_API_KEY", "")
+_AUTH_COOKIE     = "devagent_session"
+# Paths that bypass authentication
+_PUBLIC_PATHS    = {"/login", "/api/health"}
+
+
+def _check_auth(request: Request) -> bool:
+    """Return True if the request carries a valid session or API key."""
+    if not _UI_API_KEY:
+        return True  # auth disabled
+    # Cookie-based session
+    cookie_val = request.cookies.get(_AUTH_COOKIE, "")
+    if cookie_val and hmac.compare_digest(cookie_val, _UI_API_KEY):
+        return True
+    # Header-based API key (for programmatic access)
+    header_key = request.headers.get("X-API-Key", "")
+    if header_key and hmac.compare_digest(header_key, _UI_API_KEY):
+        return True
+    return False
+
 # ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="DevAgent UI", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+
+# ── Auth middleware ───────────────────────────────────────────────────────────
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Redirect unauthenticated HTML requests to /login; reject API calls with 401."""
+    if request.url.path in _PUBLIC_PATHS or not _UI_API_KEY:
+        return await call_next(request)
+    if not _check_auth(request):
+        if request.url.path.startswith("/api/"):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        next_url = str(request.url)
+        return RedirectResponse(url=f"/login?next={next_url}", status_code=302)
+    return await call_next(request)
+
+
+# ── Login / Logout routes ─────────────────────────────────────────────────────
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, next: str = "/"):
+    return templates.TemplateResponse("login.html", {"request": request, "next": next, "error": None})
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_submit(
+    request: Request,
+    api_key: Annotated[str, Form()],
+    next:    Annotated[str, Form()] = "/",
+):
+    if _UI_API_KEY and hmac.compare_digest(api_key, _UI_API_KEY):
+        resp = RedirectResponse(url=next if next.startswith("/") else "/", status_code=303)
+        resp.set_cookie(
+            _AUTH_COOKIE,
+            _UI_API_KEY,
+            httponly=True,
+            samesite="lax",
+            secure=False,   # flip to True behind HTTPS
+            max_age=7 * 24 * 3600,  # 1 week
+        )
+        return resp
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "next": next, "error": "Ungültiger API-Schlüssel."},
+        status_code=401,
+    )
+
+
+@app.post("/logout")
+async def logout():
+    resp = RedirectResponse(url="/login", status_code=303)
+    resp.delete_cookie(_AUTH_COOKIE)
+    return resp
 
 
 def _registry() -> ProjectRegistry:
@@ -168,7 +245,7 @@ async def add_project(
         try:
             room_id = _create_matrix_room(name, room_label)
         except Exception as exc:
-            return HTMLResponse(f"<p class='text-red-600 text-sm'>Matrix-Fehler: {exc}</p>")
+            return HTMLResponse(f"<p class='text-red-600 text-sm'>Matrix-Fehler beim Erstellen des Raums. Details im Log.</p>")
     elif room_action == "existing":
         room_id    = existing_room_id.strip()
         room_label = room_name.strip() or room_id
@@ -225,8 +302,8 @@ async def do_import(request: Request):
             room_label = f"DevAgent · {name}"
             try:
                 room_id = _create_matrix_room(name, room_label)
-            except Exception as exc:
-                errors.append(f"{name}: Matrix-Fehler — {exc}")
+            except Exception:
+                errors.append(f"{name}: Matrix-Fehler — Details im Log.")
                 continue
 
         proj = Project(
@@ -304,8 +381,8 @@ async def init_room(
         display_name = room_name.strip() or f"DevAgent · {name}"
         try:
             room_id = _create_matrix_room(name, display_name)
-        except Exception as exc:
-            return HTMLResponse(f"<p class='text-red-600 text-sm'>Matrix-Fehler: {exc}</p>")
+        except Exception:
+            return HTMLResponse("<p class='text-red-600 text-sm'>Matrix-Fehler beim Erstellen des Raums. Details im Log.</p>")
         flash = f"Matrix-Raum für «{name}» erstellt: {room_id}"
 
     proj.matrix_room_id   = room_id
@@ -414,8 +491,8 @@ async def api_matrix_rooms():
         rooms   = [{"id": rid, "name": client.get_room_name(room_id=rid) or rid} for rid in ids]
         rooms.sort(key=lambda r: r["name"].lower())
         return JSONResponse(rooms)
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=500)
+    except Exception:
+        return JSONResponse({"error": "Matrix-Anfrage fehlgeschlagen. Details im Log."}, status_code=500)
 
 
 @app.get("/api/worker/status")

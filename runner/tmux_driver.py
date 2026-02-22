@@ -60,6 +60,13 @@ class TmuxDriver:
         result = self._run_tmux("kill-session", "-t", session, check=False)
         return result.returncode == 0
 
+    def session_exists(self, *, job_id: str) -> bool:
+        """Return True if the tmux session for this job is still alive."""
+        result = self._run_tmux(
+            "has-session", "-t", self.session_name(job_id), check=False
+        )
+        return result.returncode == 0
+
     def capture_output(self, *, job_id: str, lines: int = 200) -> str:
         session = self.session_name(job_id)
         start_arg = f"-{lines}"

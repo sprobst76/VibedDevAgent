@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import logging
+import time
+from dataclasses import dataclass, field
 
 from adapters.matrix.reactions import ReactionDecision, evaluate_reaction
 from core.audit import append_audit_event
 from core.idempotency import IdempotencyStore
-from core.models import JobEvent, JobState
+from core.models import JobEvent, JobState, TERMINAL_STATES
 from runner.job_runner import JobRunSpec, JobRunner
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
 class JobRecord:
     job_id: str
     state: JobState
+    started_at: float = field(default=0.0)  # epoch seconds; set when RUNNING
 
 
 class DevAgentEngine:
@@ -30,6 +35,17 @@ class DevAgentEngine:
         record = JobRecord(job_id=job_id, state=JobState.RECEIVED)
         self.jobs[job_id] = record
         return record
+
+    def running_jobs(self) -> list[JobRecord]:
+        """Return all jobs currently in RUNNING state."""
+        return [j for j in self.jobs.values() if j.state == JobState.RUNNING]
+
+    def fail_job(self, job_id: str) -> None:
+        """Force-transition a job to FAILED (watchdog path, bypasses state machine)."""
+        job = self.jobs.get(job_id)
+        if job and job.state not in TERMINAL_STATES:
+            job.state = JobState.FAILED
+            log.warning("job %s force-failed by watchdog", job_id)
 
     def advance_to_wait_approval(self, job_id: str) -> JobRecord:
         record = self.jobs[job_id]
@@ -54,6 +70,17 @@ class DevAgentEngine:
     ) -> ReactionDecision:
         record = self.jobs[job_id]
         state_before = record.state
+
+        # Ignore reactions on jobs that have already reached a terminal state.
+        if state_before in TERMINAL_STATES:
+            log.debug("reaction on terminal job %s (state=%s) ignored", job_id, state_before)
+            return ReactionDecision(
+                accepted=False,
+                reason=f"job already in terminal state {state_before.value}",
+                event=None,
+                transition=None,
+            )
+
         if action_id:
             key = f"{job_id}:{action_id}"
             if not self.idempotency.mark_once(key):
@@ -100,6 +127,7 @@ class DevAgentEngine:
                             artifacts_root=self.artifacts_root,
                         )
                     )
+                    record.started_at = time.time()
                     append_audit_event(
                         artifacts_root=self.artifacts_root,
                         job_id=job_id,

@@ -24,6 +24,7 @@ from core.engine import DevAgentEngine
 from core.job_service import JobService
 from core.models import JobState
 from core.security import parse_allowed_users
+from core.watchdog import JobWatchdog
 from core.worktree_manager import WorktreeManager
 from runner.job_runner import JobRunner
 
@@ -48,6 +49,7 @@ class MatrixWorkerConfig:
     repos_root: str = "/srv/repos"
     claude_bin: str = "claude"
     ai_timeout_seconds: int = 120
+    max_job_seconds: int = 7200
     relogin_user: str = ""
     relogin_password: str = ""
     relogin_env_file: str = "/srv/devagent/.env"
@@ -137,9 +139,32 @@ class MatrixWorker:
         self._room_task_start: dict[str, float] = {}
         self._worker_start = time.time()
 
+        # Background watchdog for orphaned/hung tmux jobs
+        _tmux = getattr(engine.runner, "tmux", None) if engine.runner is not None else None
+        if _tmux is not None:
+            self._watchdog: JobWatchdog | None = JobWatchdog(
+                engine=engine,
+                tmux=_tmux,
+                room_id_for=self._room_id_for_job,
+                notify_fn=lambda room_id, msg: self.client.send_notice(room_id=room_id, body=msg),
+                max_job_seconds=config.max_job_seconds,
+            )
+            self._watchdog.start()
+        else:
+            self._watchdog = None
+
+    def _room_id_for_job(self, job_id: str) -> str | None:
+        """Look up the Matrix room that owns a given job_id."""
+        for context in self.state.jobcards.values():
+            if context.get("job_id") == job_id:
+                return context.get("room_id") or None
+        return None
+
     def stop(self) -> None:
         self._running = False
         self._ai_executor.shutdown(wait=False)
+        if self._watchdog is not None:
+            self._watchdog.stop()
 
     # ── Room map (projects.json → room_id → project_name) ────────────────────
 

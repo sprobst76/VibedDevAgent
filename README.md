@@ -215,8 +215,9 @@ bash ops/checks/post_reboot_check.sh
 
 ## License
 
-MIT with [Commons Clause](LICENSE) — free to use internally (including in
-companies), but selling the software as a product or service is not permitted.
+[GNU AGPL v3](LICENSE) — free to use, modify, and distribute, including
+commercially. If you run a modified version as a network service, you must
+make the source available. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

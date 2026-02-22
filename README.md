@@ -213,6 +213,13 @@ implemented controls. Key points:
 bash ops/checks/post_reboot_check.sh
 ```
 
+## License
+
+MIT with [Commons Clause](LICENSE) — free to use internally (including in
+companies), but selling the software as a product or service is not permitted.
+
+---
+
 ## Diagnostic scripts
 
 ```bash

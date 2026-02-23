@@ -132,6 +132,32 @@ class SplitForMatrixTests(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertTrue(all(len(c) > 0 for c in result))
 
+    def test_hard_cut_prefers_line_boundary(self) -> None:
+        # Single paragraph: 3700 a's + newline + 200 b's = 3901 chars total
+        # The newline is at position 3700, well past the midpoint → split there
+        line1 = "a" * 3700 + "\n"
+        line2 = "b" * 200
+        result = MatrixWorker._split_for_matrix(line1 + line2, max_chars=3800)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], line1)
+        self.assertEqual(result[1], line2)
+
+    def test_hard_cut_prefers_word_boundary(self) -> None:
+        # 3700 x's + space + 199 y's = 3900 chars, space at position 3700
+        # Should split just after the space, not at hard 3800
+        text = "x" * 3700 + " " + "y" * 199
+        result = MatrixWorker._split_for_matrix(text, max_chars=3800)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], "x" * 3700 + " ")
+        self.assertEqual(result[1], "y" * 199)
+
+    def test_hard_cut_falls_back_when_no_boundary_in_first_half(self) -> None:
+        # Space only in first 10% of chunk → hard cut, no shift
+        text = "x" * 100 + " " + "x" * 3900  # space at 100, rest fills 3900+
+        result = MatrixWorker._split_for_matrix(text, max_chars=3800)
+        for chunk in result:
+            self.assertLessEqual(len(chunk), 3800)
+
 
 # ── _record_history ───────────────────────────────────────────────────────────
 

@@ -538,9 +538,28 @@ class MatrixWorker:
 
     @staticmethod
     def _split_for_matrix(text: str, max_chars: int = 3800) -> list[str]:
-        """Split text at paragraph boundaries into chunks of at most max_chars."""
+        """Split text at paragraph/line/word boundaries into chunks of at most max_chars."""
         if len(text) <= max_chars:
             return [text]
+
+        def _hard_cut(s: str) -> list[str]:
+            """Cut s into <=max_chars pieces, preferring line then word boundaries."""
+            result: list[str] = []
+            while len(s) > max_chars:
+                cut = max_chars
+                nl = s.rfind("\n", 0, max_chars)
+                if nl > max_chars // 2:
+                    cut = nl + 1
+                else:
+                    sp = s.rfind(" ", 0, max_chars)
+                    if sp > max_chars // 2:
+                        cut = sp + 1
+                result.append(s[:cut])
+                s = s[cut:]
+            if s:
+                result.append(s)
+            return result
+
         chunks: list[str] = []
         buf = ""
         for para in text.split("\n\n"):
@@ -553,11 +572,9 @@ class MatrixWorker:
                 if len(para) <= max_chars:
                     buf = para
                 else:
-                    # para too long — hard-cut at max_chars
-                    while len(para) > max_chars:
-                        chunks.append(para[:max_chars])
-                        para = para[max_chars:]
-                    buf = para
+                    sub = _hard_cut(para)
+                    chunks.extend(sub[:-1])
+                    buf = sub[-1]
         if buf:
             chunks.append(buf)
         return chunks

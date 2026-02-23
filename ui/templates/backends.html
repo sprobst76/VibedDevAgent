@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}DevAgent — Backends{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-xl font-bold tracking-tight text-drac-fg">Backends</h1>
+      <p class="text-xs text-drac-comment mt-0.5">
+        {{ backends | length }} konfiguriert ·
+        {{ backends | selectattr('online') | list | length }} online
+      </p>
+    </div>
+    <button onclick="location.reload()"
+            class="text-xs text-drac-comment hover:text-drac-fg border border-drac-line hover:border-drac-comment
+                   rounded-lg px-3 py-1.5 transition-colors">
+      ↻ Aktualisieren
+    </button>
+  </div>
+
+  {% if not backends %}
+    <!-- No backends configured -->
+    <div class="bg-drac-surface border border-drac-line rounded-xl p-8 text-center space-y-3">
+      <p class="text-drac-comment text-sm">Keine Backends konfiguriert.</p>
+      <p class="text-drac-comment text-xs">
+        Setze <code class="bg-drac-bg border border-drac-line rounded px-1.5 py-0.5 font-mono">DEVAGENT_BACKENDS</code>
+        in der <code class="bg-drac-bg border border-drac-line rounded px-1.5 py-0.5 font-mono">.env</code>:
+      </p>
+      <code class="block text-xs font-mono bg-drac-bg border border-drac-line rounded-lg px-4 py-3 text-drac-cyan text-left max-w-md mx-auto">
+        DEVAGENT_BACKENDS=home=http://100.x.x.x:20042,vps=http://100.y.y.y:20042
+      </code>
+    </div>
+  {% else %}
+
+  <!-- Backend status cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for b in backends %}
+    <div class="bg-drac-surface border {% if b.online %}border-drac-line{% else %}border-drac-red/30{% endif %}
+                rounded-xl p-5 space-y-3 {% if not b.online %}opacity-60{% endif %}">
+
+      <!-- Name + status dot -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full shrink-0
+                       {% if b.online %}bg-drac-green{% else %}bg-drac-red{% endif %}"></span>
+          <span class="text-sm font-semibold text-drac-fg">{{ b.name }}</span>
+        </div>
+        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full
+                     {% if b.online %}bg-drac-green/10 text-drac-green border border-drac-green/30
+                     {% else %}bg-drac-red/10 text-drac-red border border-drac-red/30{% endif %}">
+          {% if b.online %}online{% else %}offline{% endif %}
+        </span>
+      </div>
+
+      <!-- URL -->
+      <p class="text-xs font-mono text-drac-comment truncate">{{ b.url }}</p>
+
+      {% if b.online %}
+      <!-- Stats grid -->
+      <div class="grid grid-cols-3 gap-2 text-center pt-1 border-t border-drac-line/40">
+        <div>
+          <p class="text-[10px] text-drac-comment">Projekte</p>
+          <p class="text-sm font-bold text-drac-purple">{{ b.projects_count }}</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-drac-comment">Jobs</p>
+          <p class="text-sm font-bold text-drac-fg">{{ b.total_jobs }}</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-drac-comment">Laufend</p>
+          <p class="text-sm font-bold {% if b.running_jobs > 0 %}text-drac-cyan{% else %}text-drac-comment{% endif %}">
+            {{ b.running_jobs }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Worker + uptime -->
+      <div class="flex items-center justify-between text-xs pt-1 border-t border-drac-line/40">
+        <div class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full {% if b.worker_running %}bg-drac-green{% else %}bg-drac-red{% endif %}"></span>
+          <span class="{% if b.worker_running %}text-drac-green{% else %}text-drac-red{% endif %}">
+            Worker {% if b.worker_running %}aktiv{% else %}offline{% endif %}
+          </span>
+        </div>
+        {% if b.uptime_seconds is not none %}
+        <span class="text-drac-comment font-mono">
+          {% set h = (b.uptime_seconds // 3600) | int %}
+          {% set m = ((b.uptime_seconds % 3600) // 60) | int %}
+          {% if h > 0 %}{{ h }}h {% endif %}{{ m }}m uptime
+        </span>
+        {% endif %}
+      </div>
+
+      <!-- Link to backend UI -->
+      <a href="{{ b.url }}" target="_blank" rel="noopener"
+         class="block text-center text-xs text-drac-purple hover:text-[#a57ee8] transition-colors
+                border border-drac-purple/30 hover:border-drac-purple/60 rounded-lg py-1.5 mt-1">
+        UI öffnen →
+      </a>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Aggregated Projects -->
+  {% if all_projects %}
+  <div class="space-y-3">
+    <h2 class="text-sm font-semibold text-drac-comment uppercase tracking-wider">
+      Projekte ({{ all_projects | length }} gesamt)
+    </h2>
+    <div class="bg-drac-surface border border-drac-line rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="border-b border-drac-line text-drac-comment">
+            <th class="text-left px-4 py-3 font-medium">Projekt</th>
+            <th class="text-left px-4 py-3 font-medium">Backend</th>
+            <th class="text-left px-4 py-3 font-medium hidden sm:table-cell">Pfad</th>
+            <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Matrix-Raum</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-drac-line/40">
+          {% for p in all_projects %}
+          <tr class="hover:bg-drac-line/10 transition-colors">
+            <td class="px-4 py-3">
+              <span class="font-medium text-drac-fg">{{ p.name }}</span>
+              {% if p.initialized %}
+                <span class="ml-1.5 text-[10px] bg-drac-green/10 text-drac-green border border-drac-green/30 rounded-full px-1.5 py-0.5">✓</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <span class="bg-drac-purple/10 text-drac-purple border border-drac-purple/30 rounded-full px-2 py-0.5">
+                {{ p.backend }}
+              </span>
+            </td>
+            <td class="px-4 py-3 font-mono text-drac-comment truncate max-w-[200px] hidden sm:table-cell">
+              {{ p.local_path or '—' }}
+            </td>
+            <td class="px-4 py-3 font-mono text-drac-comment truncate max-w-[200px] hidden md:table-cell">
+              {{ p.matrix_room_id or '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Aggregated Jobs -->
+  {% if all_jobs %}
+  <div class="space-y-3">
+    <h2 class="text-sm font-semibold text-drac-comment uppercase tracking-wider">
+      Letzte Jobs ({{ all_jobs | length }})
+    </h2>
+    <div class="bg-drac-surface border border-drac-line rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="border-b border-drac-line text-drac-comment">
+            <th class="text-left px-4 py-3 font-medium">Job-ID</th>
+            <th class="text-left px-4 py-3 font-medium">Backend</th>
+            <th class="text-left px-4 py-3 font-medium">Status</th>
+            <th class="text-left px-4 py-3 font-medium hidden sm:table-cell">Projekt</th>
+            <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Zuletzt</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-drac-line/40">
+          {% for job in all_jobs %}
+          <tr class="hover:bg-drac-line/10 transition-colors">
+            <td class="px-4 py-3 font-mono text-drac-comment">{{ job.short_id }}…</td>
+            <td class="px-4 py-3">
+              <span class="bg-drac-purple/10 text-drac-purple border border-drac-purple/30 rounded-full px-2 py-0.5">
+                {{ job.backend }}
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              {% if job.state == 'RUNNING' %}
+                <span class="bg-drac-cyan/10 text-drac-cyan border border-drac-cyan/30 rounded-full px-2 py-0.5">RUNNING</span>
+              {% elif job.state == 'DONE' %}
+                <span class="bg-drac-green/10 text-drac-green border border-drac-green/30 rounded-full px-2 py-0.5">✓ DONE</span>
+              {% elif job.state == 'FAILED' %}
+                <span class="bg-drac-red/10 text-drac-red border border-drac-red/30 rounded-full px-2 py-0.5">✗ FAILED</span>
+              {% elif job.state == 'CANCELLED' %}
+                <span class="bg-drac-comment/20 text-drac-comment rounded-full px-2 py-0.5">🛑</span>
+              {% else %}
+                <span class="bg-drac-line/40 text-drac-comment rounded-full px-2 py-0.5">{{ job.state }}</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-drac-comment hidden sm:table-cell">{{ job.project or '—' }}</td>
+            <td class="px-4 py-3 font-mono text-drac-comment hidden md:table-cell">
+              {{ (job.updated_at or job.created_at or '')[:16] }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% elif backends | selectattr('online') | list %}
+  <p class="text-xs text-drac-comment">Keine Jobs auf den Online-Backends gefunden.</p>
+  {% endif %}
+
+  {% endif %}{# /if backends #}
+
+</div>
+{% endblock %}

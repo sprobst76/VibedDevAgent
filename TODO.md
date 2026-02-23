@@ -215,9 +215,9 @@ touch docs/event-push.md
 - [x] UI-Panel in der Detail-Ansicht
 
 ### 19) Multi-Backend UI
-- [ ] UI kann mehrere Backend-URLs konfigurieren (z.B. Heim-PC + VPS)
-- [ ] Jeder Backend liefert `/api/health` + `/api/projects` + `/api/jobs`
-- [ ] Aggregierte Ansicht aller Backends in einem Frontend
+- [x] UI kann mehrere Backend-URLs konfigurieren (z.B. Heim-PC + VPS)
+- [x] Jeder Backend liefert `/api/health` + `/api/projects` + `/api/jobs`
+- [x] Aggregierte Ansicht aller Backends in einem Frontend
 
 ### 21) Scheduled Tasks
 - [ ] `!schedule "täglich 09:00" <aufgabe>` — Cron-ähnliche Tasks pro Raum

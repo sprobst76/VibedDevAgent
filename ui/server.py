@@ -9,6 +9,9 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -39,6 +42,14 @@ LOG_FILE          = os.getenv("DEVAGENT_LOG_FILE", "/var/log/devagent/worker.log
 VERSION           = "0.1.0"
 BACKEND_ID        = socket.gethostname()
 _START_TIME       = datetime.now(timezone.utc)
+
+# Multi-backend federation: DEVAGENT_BACKENDS=home=http://100.x.x.x:20042,vps=http://...
+BACKENDS: dict[str, str] = {}
+for _entry in os.getenv("DEVAGENT_BACKENDS", "").split(","):
+    _entry = _entry.strip()
+    if "=" in _entry:
+        _n, _, _u = _entry.partition("=")
+        BACKENDS[_n.strip()] = _u.strip()
 
 # ── Auth config ───────────────────────────────────────────────────────────────
 # If DEVAGENT_UI_API_KEY is empty the UI runs without authentication (dev mode).
@@ -788,6 +799,91 @@ async def api_stats(request: Request):
             f' hx-swap="outerHTML" hx-select="#nav-running-badge">{badge}</span>'
         )
     return JSONResponse(data)
+
+
+# ── Multi-backend federation ──────────────────────────────────────────────────
+
+def _fetch_backend(url: str, path: str, timeout: float = 3.0) -> dict | list | None:
+    """Fetch JSON from a remote backend. Returns None on any error."""
+    full_url = url.rstrip("/") + path
+    req = urllib.request.Request(full_url)
+    if _UI_API_KEY:
+        req.add_header("X-API-Key", _UI_API_KEY)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _poll_backends() -> list[dict]:
+    """Poll all configured backends in parallel and return status dicts."""
+    if not BACKENDS:
+        return []
+
+    def _probe(name: str, url: str) -> dict:
+        health = _fetch_backend(url, "/api/health") or {}
+        stats  = _fetch_backend(url, "/api/stats")  or {}
+        worker = _fetch_backend(url, "/api/worker/status") or {}
+        online = bool(health.get("status") == "ok")
+        return {
+            "name":           name,
+            "url":            url,
+            "online":         online,
+            "backend_id":     health.get("backend_id", name),
+            "uptime_seconds": health.get("uptime_seconds"),
+            "projects_count": stats.get("projects_count", health.get("projects_count", 0)),
+            "running_jobs":   stats.get("running_jobs", 0),
+            "total_jobs":     stats.get("total_jobs", 0),
+            "worker_running": worker.get("running", False),
+        }
+
+    workers = max(1, len(BACKENDS))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(lambda item: _probe(*item), BACKENDS.items()))
+    return results
+
+
+@app.get("/backends", response_class=HTMLResponse)
+async def backends_page(request: Request):
+    backends = await asyncio.get_event_loop().run_in_executor(None, _poll_backends)
+
+    all_projects: list[dict] = []
+    all_jobs: list[dict] = []
+
+    def _fetch_data(b: dict) -> None:
+        if not b["online"]:
+            return
+        projs = _fetch_backend(b["url"], "/api/projects") or []
+        if isinstance(projs, list):
+            for p in projs:
+                p["backend"] = b["name"]
+                all_projects.append(p)
+        jobs = _fetch_backend(b["url"], "/api/jobs?limit=20") or []
+        if isinstance(jobs, list):
+            for j in jobs:
+                j["backend"] = b["name"]
+                all_jobs.append(j)
+
+    for b in backends:
+        _fetch_data(b)
+
+    all_jobs.sort(key=lambda x: x.get("updated_at") or x.get("created_at") or "", reverse=True)
+    all_projects.sort(key=lambda x: (x.get("backend", ""), x.get("name", "").lower()))
+
+    return templates.TemplateResponse("backends.html", {
+        "request":      request,
+        "backends":     backends,
+        "all_projects": all_projects,
+        "all_jobs":     all_jobs[:50],
+    })
+
+
+@app.get("/api/backends")
+async def api_backends():
+    """Return health/stats for all configured backends (no projects/jobs)."""
+    backends = await asyncio.get_event_loop().run_in_executor(None, _poll_backends)
+    return JSONResponse(backends)
 
 
 # ── Routes: Live Log ──────────────────────────────────────────────────────────

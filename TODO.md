@@ -233,3 +233,11 @@ touch docs/event-push.md
 - [ ] `subprocess.Popen` mit `pty.openpty()` für bessere Kompatibilität
 - [ ] Vor allem relevant wenn `--print` entfernt wird
 - [ ] Referenz: OpenClaw coding-agent SKILL.md `pty:true`
+
+### 23) Projekt-TODO-Übersicht in Matrix und Web UI
+- [ ] `todo_parser.py` erweitern: scannt `<local_path>/TODO.md` pro Projekt aus der Registry
+- [ ] Matrix: `!todo @<projektname>` zeigt offene TODOs des jeweiligen Projekts
+- [ ] Matrix: `!todo` ohne Argument zeigt Zusammenfassung aller Projekte (N offen je Projekt)
+- [ ] Web UI: Projekt-Detail-Panel (`partials/project_detail.html`) zeigt offene TODO-Items
+- [ ] Web UI: `/todos`-Seite bekommt Tab-Wechsel "DevAgent" / "Projekte"
+- [ ] Fallback: kein TODO.md im Projekt → Hinweis statt Fehler

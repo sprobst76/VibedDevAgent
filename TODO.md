@@ -210,9 +210,9 @@ touch docs/event-push.md
 - [ ] MAX_OUTPUT_CHARS in .env konfigurierbar machen
 
 ### 18) Live-Log im Browser
-- [ ] Server-Sent Events Endpoint `/api/logs/stream`
-- [ ] Letzte 100 Zeilen von `core.log` + live tail
-- [ ] UI-Panel in der Detail-Ansicht
+- [x] Server-Sent Events Endpoint `/api/logs/stream`
+- [x] Letzte 100 Zeilen von `core.log` + live tail
+- [x] UI-Panel in der Detail-Ansicht
 
 ### 19) Multi-Backend UI
 - [ ] UI kann mehrere Backend-URLs konfigurieren (z.B. Heim-PC + VPS)

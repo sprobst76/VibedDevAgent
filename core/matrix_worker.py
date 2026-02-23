@@ -238,8 +238,23 @@ class MatrixWorker:
 
     # ── Main loop ─────────────────────────────────────────────────────────────
 
+    def _warn_if_no_relogin(self) -> None:
+        """Send a one-time warning to the primary room if auto-relogin is not configured."""
+        if self.client._login_user:  # noqa: SLF001
+            return
+        msg = (
+            "⚠️ **DevAgent Warnung:** Auto-Relogin ist nicht konfiguriert.\n"
+            "Wenn der Matrix-Access-Token abläuft, stoppt der Bot ohne Vorwarnung.\n"
+            "Bitte `MATRIX_USER_DEVAGENT` und `MATRIX_PASSWORD_DEVAGENT` in `.env` setzen."
+        )
+        try:
+            self.client.send_message(room_id=self.config.room_id, body=msg)
+        except Exception:
+            log.debug("could not send relogin warning to room (non-fatal)")
+
     def run_forever(self) -> None:
         log.info("worker started, primary room=%s", self.config.room_id)
+        self._warn_if_no_relogin()
         while self._running:
             # Refresh room map every cycle (cheap JSON read)
             self._refresh_room_map()
@@ -717,6 +732,12 @@ def build_worker(config: MatrixWorkerConfig) -> MatrixWorker:
             env_file=config.relogin_env_file,
         )
         log.info("auto re-login configured for %s", config.relogin_user)
+    else:
+        log.warning(
+            "⚠️  Auto-relogin NOT configured — if the Matrix access token expires the worker "
+            "will stop responding. Set MATRIX_USER_DEVAGENT and MATRIX_PASSWORD_DEVAGENT in .env "
+            "to enable automatic token renewal."
+        )
     return MatrixWorker(config=config, client=client, engine=engine, jobs=jobs, worktrees=worktrees)
 
 

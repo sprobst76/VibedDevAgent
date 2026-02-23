@@ -26,6 +26,8 @@ from runner.job_runner import JobRunHandle
 class FakeMatrixClient:
     def __init__(self) -> None:
         self.notices: list[tuple[str, str]] = []
+        self.messages: list[tuple[str, str]] = []
+        self._login_user: str = ""
 
     def sync(self, *, since, timeout_ms=30000) -> MatrixSyncResult:
         return MatrixSyncResult(next_batch=since or "t0", payload={"rooms": {"join": {}}})
@@ -35,6 +37,7 @@ class FakeMatrixClient:
         return {}
 
     def send_message(self, *, room_id: str, body: str, msgtype="m.text") -> dict:
+        self.messages.append((room_id, body))
         return {}
 
 
@@ -401,6 +404,40 @@ class LoadConfigFromEnvTests(unittest.TestCase):
             self.assertIn("alice: hello", msg)
             self.assertIn("bot: hi there", msg)
             self.assertIn("do something", msg)
+
+
+# ── _warn_if_no_relogin ────────────────────────────────────────────────────────
+
+class WarnIfNoReloginTests(unittest.TestCase):
+    def test_sends_matrix_message_when_no_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            worker, client = _make_worker(tmp, room_id="!main:m.org")
+            client._login_user = ""
+            worker._warn_if_no_relogin()
+            self.assertEqual(len(client.messages), 1)
+            room_id, body = client.messages[0]
+            self.assertEqual(room_id, "!main:m.org")
+            self.assertIn("Auto-Relogin", body)
+            self.assertIn("MATRIX_USER_DEVAGENT", body)
+
+    def test_no_message_when_credentials_configured(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            worker, client = _make_worker(tmp)
+            client._login_user = "@bot:m.org"
+            worker._warn_if_no_relogin()
+            self.assertEqual(client.messages, [])
+
+    def test_matrix_error_does_not_crash_worker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            worker, client = _make_worker(tmp)
+            client._login_user = ""
+
+            def _raise(*_args, **_kwargs):
+                raise RuntimeError("network error")
+
+            client.send_message = _raise  # type: ignore[method-assign]
+            # Should not raise
+            worker._warn_if_no_relogin()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}DevAgent — TODOs{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header + summary -->
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-xl font-bold tracking-tight text-drac-fg">TODOs</h1>
+      <p class="text-xs text-drac-comment mt-0.5">
+        {% set ns = namespace(open=0, done=0) %}
+        {% for s in sections %}
+          {% set ns.open = ns.open + (s.open_items | length) %}
+          {% set ns.done = ns.done + s.done_count %}
+        {% endfor %}
+        {{ ns.open }} offen · {{ ns.done }} erledigt · {{ ns.open + ns.done }} gesamt
+      </p>
+    </div>
+    <a href="https://github.com/sprobst76/VibedDevAgent/blob/main/TODO.md"
+       target="_blank"
+       class="text-xs text-drac-comment hover:text-drac-fg border border-drac-line hover:border-drac-comment
+              rounded-lg px-3 py-1.5 transition-colors">
+      TODO.md auf GitHub →
+    </a>
+  </div>
+
+  <!-- Priority sections -->
+  <div class="space-y-4">
+    {% for section in sections %}
+    {% set open_count = section.open_items | length %}
+    {% set pct = ((section.done_count / section.total * 100) | int) if section.total > 0 else 100 %}
+
+    <div class="bg-drac-surface border border-drac-line rounded-xl overflow-hidden shadow-sm">
+
+      <!-- Section header -->
+      <button onclick="toggleSection('sec-{{ loop.index }}')"
+              class="w-full flex items-center justify-between px-5 py-4 hover:bg-drac-line/20 transition-colors group">
+        <div class="flex items-center gap-3">
+          <!-- Priority badge -->
+          {% if section.priority == 'P0' %}
+            <span class="text-xs font-bold bg-drac-cyan/10 text-drac-cyan border border-drac-cyan/30 rounded-full px-2.5 py-0.5">{{ section.priority }}</span>
+          {% elif section.priority == 'P1' %}
+            <span class="text-xs font-bold bg-drac-green/10 text-drac-green border border-drac-green/30 rounded-full px-2.5 py-0.5">{{ section.priority }}</span>
+          {% elif section.priority == 'P1-SECURITY' %}
+            <span class="text-xs font-bold bg-drac-red/10 text-drac-red border border-drac-red/30 rounded-full px-2.5 py-0.5">{{ section.priority }}</span>
+          {% elif section.priority == 'P2' %}
+            <span class="text-xs font-bold bg-drac-purple/10 text-drac-purple border border-drac-purple/30 rounded-full px-2.5 py-0.5">{{ section.priority }}</span>
+          {% else %}
+            <span class="text-xs font-bold bg-drac-orange/10 text-drac-orange border border-drac-orange/30 rounded-full px-2.5 py-0.5">{{ section.priority }}</span>
+          {% endif %}
+
+          <span class="text-sm font-medium text-drac-fg">{{ section.title }}</span>
+        </div>
+
+        <div class="flex items-center gap-4 shrink-0">
+          <!-- Stats -->
+          <span class="text-xs text-drac-comment">
+            {{ section.done_count }}/{{ section.total }}
+            {% if open_count > 0 %}
+              · <span class="text-drac-orange">{{ open_count }} offen</span>
+            {% else %}
+              · <span class="text-drac-green">✓ fertig</span>
+            {% endif %}
+          </span>
+          <!-- Chevron -->
+          <span id="chev-{{ loop.index }}" class="text-drac-comment text-xs transition-transform">▼</span>
+        </div>
+      </button>
+
+      <!-- Progress bar -->
+      <div class="h-1 bg-drac-line/40">
+        <div class="h-1 transition-all duration-500
+          {% if open_count == 0 %}bg-drac-green
+          {% elif section.priority == 'P1-SECURITY' %}bg-drac-red
+          {% else %}bg-drac-purple{% endif %}"
+          style="width: {{ pct }}%">
+        </div>
+      </div>
+
+      <!-- Items (collapsible) -->
+      <div id="sec-{{ loop.index }}" class="{% if open_count == 0 and section.done_count > 0 %}hidden{% endif %}">
+        <div class="px-5 py-3 space-y-1">
+
+          <!-- Open items -->
+          {% for item in section.open_items %}
+          <div class="flex items-start gap-2.5 py-1 text-xs">
+            <span class="mt-0.5 w-4 h-4 shrink-0 rounded border border-drac-line flex items-center justify-center"></span>
+            <span class="text-drac-fg">{{ item }}</span>
+          </div>
+          {% endfor %}
+
+          <!-- Done placeholder (collapsed summary) -->
+          {% if section.done_count > 0 %}
+          <div class="flex items-center gap-2 pt-1 mt-1 border-t border-drac-line/40">
+            <span class="text-xs text-drac-comment">
+              {{ section.done_count }} erledigte Item{{ 's' if section.done_count != 1 else '' }} ausgeblendet
+            </span>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<script>
+function toggleSection(id) {
+  const el   = document.getElementById(id);
+  const idx  = id.split('-')[1];
+  const chev = document.getElementById('chev-' + idx);
+  const hidden = el.classList.toggle('hidden');
+  chev.style.transform = hidden ? 'rotate(-90deg)' : '';
+}
+</script>
+{% endblock %}

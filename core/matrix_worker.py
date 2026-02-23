@@ -24,6 +24,8 @@ from core.engine import DevAgentEngine
 from core.job_service import JobService
 from core.models import JobState
 from core.security import parse_allowed_users
+from core.todo_parser import format_for_matrix as _todo_format
+from core.todo_parser import parse_todo_file as _parse_todo
 from core.watchdog import JobWatchdog
 from core.worktree_manager import WorktreeManager
 from runner.job_runner import JobRunner
@@ -53,6 +55,7 @@ class MatrixWorkerConfig:
     relogin_user: str = ""
     relogin_password: str = ""
     relogin_env_file: str = "/srv/devagent/.env"
+    todo_file: str = ""  # path to TODO.md; auto-detected if empty
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -321,6 +324,8 @@ class MatrixWorker:
                 self._handle_cancel(event)
             elif lower == "!help":
                 self._handle_help(event)
+            elif lower == "!todo" or lower == "!todos":
+                self._handle_todo(event)
             elif self._is_ai_message(event):
                 self._handle_ai_message(event)
             elif lower.startswith("devagent_jobcard "):
@@ -530,9 +535,26 @@ class MatrixWorker:
                 "`!ai @<repo> <aufgabe>` — In spezifischem Repo ausführen\n"
                 "`!status` — Worker-Status anzeigen\n"
                 "`!cancel` — Laufenden Task abbrechen\n"
+                "`!todo` — Offene TODOs anzeigen\n"
                 "`!help` — Diese Hilfe"
             ),
         )
+
+    def _handle_todo(self, event: dict[str, Any]) -> None:
+        room_id = str(event.get("room_id", self.config.room_id))
+        todo_path = self.config.todo_file or str(
+            Path(__file__).parent.parent / "TODO.md"
+        )
+        sections = _parse_todo(todo_path)
+        if not sections:
+            self.client.send_notice(
+                room_id=room_id,
+                body="⚠️ TODO.md nicht gefunden oder leer.",
+            )
+            return
+        text = _todo_format(sections)
+        for chunk in self._split_for_matrix(text):
+            self.client.send_notice(room_id=room_id, body=chunk)
 
     # ── Output splitting ──────────────────────────────────────────────────────
 
@@ -732,6 +754,7 @@ def load_config_from_env() -> MatrixWorkerConfig:
         relogin_user=os.getenv("MATRIX_USER_DEVAGENT", ""),
         relogin_password=os.getenv("MATRIX_PASSWORD_DEVAGENT", ""),
         relogin_env_file=os.getenv("DEVAGENT_ENV_FILE", "/srv/devagent/.env"),
+        todo_file=os.getenv("DEVAGENT_TODO_FILE", ""),
     )
 
 

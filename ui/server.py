@@ -22,10 +22,12 @@ from fastapi.templating import Jinja2Templates
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from adapters.matrix.client import MatrixClient
+from core.todo_parser import parse_todo_file as _parse_todo
 from ui.projects_registry import Project, ProjectRegistry, scan_local_projects
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
+TODO_FILE         = os.getenv("DEVAGENT_TODO_FILE", str(Path(__file__).parent.parent / "TODO.md"))
 DEVELOPMENT_ROOT  = os.getenv("DEVAGENT_DEVELOPMENT_ROOT", str(Path.home() / "development"))
 REGISTRY_FILE     = os.getenv("DEVAGENT_PROJECTS_FILE", "/srv/devagent/state/projects.json")
 MATRIX_HOMESERVER = os.getenv("MATRIX_HOMESERVER_URL", "https://matrix.org")
@@ -566,6 +568,27 @@ async def api_worker_status(request: Request, format: str = "json"):
 async def jobs_page(request: Request):
     jobs = _get_recent_jobs(limit=50)
     return templates.TemplateResponse("jobs.html", {"request": request, "jobs": jobs})
+
+
+@app.get("/todos", response_class=HTMLResponse)
+async def todos_page(request: Request):
+    sections = _parse_todo(TODO_FILE)
+    return templates.TemplateResponse("todos.html", {"request": request, "sections": sections})
+
+
+@app.get("/api/todos")
+async def api_todos():
+    sections = _parse_todo(TODO_FILE)
+    return JSONResponse([
+        {
+            "priority":   s.priority,
+            "title":      s.title,
+            "open_items": s.open_items,
+            "done_count": s.done_count,
+            "total":      s.total,
+        }
+        for s in sections
+    ])
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)

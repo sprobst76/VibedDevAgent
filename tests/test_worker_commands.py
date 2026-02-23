@@ -1,9 +1,12 @@
 """Tests for MatrixWorker: _split_for_matrix, _record_history, commands, per-room lock."""
 from __future__ import annotations
 
+import json
 import tempfile
+import textwrap
 import threading
 import unittest
+from pathlib import Path
 
 from adapters.matrix.client import MatrixSyncResult
 from core.engine import DevAgentEngine
@@ -410,6 +413,98 @@ class ProcessSyncPayloadTests(unittest.TestCase):
             }
             worker.process_sync_payload(payload)
             self.assertEqual(len(client.notices), 0)
+
+
+_SAMPLE_TODO = textwrap.dedent("""\
+    ## P0 -- Basis
+    - [x] Fertig
+    - [ ] Noch offen
+
+    ## P1 -- Extras
+    - [ ] Extra-Item
+""")
+
+
+class HandleTodoCommandTests(unittest.TestCase):
+    """Tests for !todo, !todo @<project>, and fallback behaviour."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp()
+        self.worker, self.client = _make_worker(self.tmp)
+        self.room = "!room:matrix.org"
+
+    def _make_projects_file(self, projects: dict) -> str:
+        path = Path(self.tmp) / "projects.json"
+        path.write_text(json.dumps({"projects": projects}), encoding="utf-8")
+        return str(path)
+
+    def _make_project_with_todo(self, name: str, todo_content: str) -> str:
+        proj_dir = Path(self.tmp) / name
+        proj_dir.mkdir(exist_ok=True)
+        (proj_dir / "TODO.md").write_text(todo_content, encoding="utf-8")
+        return str(proj_dir)
+
+    def test_todo_without_arg_sends_notice(self) -> None:
+        """!todo with no projects file falls back to DevAgent's own TODO (or sends error)."""
+        # No projects file → falls back to DevAgent TODO which may not exist in tmp
+        # → sends a "not found" notice or a summary
+        self.worker.process_event(_msg_event("!todo"))
+        self.assertGreater(len(self.client.notices), 0)
+
+    def test_todo_project_summary_lists_project_names(self) -> None:
+        """!todo with projects registered should include project names."""
+        proj_path = self._make_project_with_todo("MyProject", _SAMPLE_TODO)
+        projects_path = self._make_projects_file({
+            "MyProject": {"local_path": proj_path},
+        })
+        # Point worker at this projects file
+        self.worker.config = self.worker.config.__class__(
+            **{**self.worker.config.__dict__, "projects_file": projects_path}
+        )
+        self.worker.process_event(_msg_event("!todo"))
+        bodies = " ".join(self.client.notices_for(self.room))
+        self.assertIn("MyProject", bodies)
+
+    def test_todo_at_project_shows_project_todos(self) -> None:
+        """!todo @MyProject should show that project's open TODOs."""
+        proj_path = self._make_project_with_todo("MyProject", _SAMPLE_TODO)
+        projects_path = self._make_projects_file({
+            "MyProject": {"local_path": proj_path},
+        })
+        from dataclasses import replace
+        self.worker.config = replace(self.worker.config, projects_file=projects_path)
+        self.worker.process_event(_msg_event("!todo @MyProject"))
+        bodies = " ".join(self.client.notices_for(self.room))
+        self.assertIn("MyProject", bodies)
+        self.assertIn("Noch offen", bodies)
+
+    def test_todo_at_unknown_project_sends_error(self) -> None:
+        """!todo @NoSuchProject should send an error notice."""
+        projects_path = self._make_projects_file({})
+        from dataclasses import replace
+        self.worker.config = replace(self.worker.config, projects_file=projects_path)
+        self.worker.process_event(_msg_event("!todo @NoSuchProject"))
+        bodies = " ".join(self.client.notices_for(self.room))
+        self.assertIn("NoSuchProject", bodies)
+
+    def test_todo_at_project_without_todo_md_sends_fallback(self) -> None:
+        """!todo @EmptyProject (no TODO.md) should send a 'not found' notice."""
+        empty_dir = Path(self.tmp) / "EmptyProject"
+        empty_dir.mkdir(exist_ok=True)
+        projects_path = self._make_projects_file({
+            "EmptyProject": {"local_path": str(empty_dir)},
+        })
+        from dataclasses import replace
+        self.worker.config = replace(self.worker.config, projects_file=projects_path)
+        self.worker.process_event(_msg_event("!todo @EmptyProject"))
+        bodies = " ".join(self.client.notices_for(self.room))
+        # Should mention the project or "not found"
+        self.assertTrue("EmptyProject" in bodies or "gefunden" in bodies)
+
+    def test_todos_alias_also_works(self) -> None:
+        """!todos should route to the same handler as !todo."""
+        self.worker.process_event(_msg_event("!todos"))
+        self.assertGreater(len(self.client.notices), 0)
 
 
 if __name__ == "__main__":

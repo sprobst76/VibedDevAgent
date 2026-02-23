@@ -6,7 +6,14 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from core.todo_parser import TodoSection, format_for_matrix, parse_todo_file
+from core.todo_parser import (
+    TodoSection,
+    format_for_matrix,
+    format_project_detail,
+    format_project_summary,
+    get_project_todos,
+    parse_todo_file,
+)
 
 SAMPLE = textwrap.dedent("""\
     # TODO
@@ -117,6 +124,98 @@ class FormatForMatrixTests(unittest.TestCase):
 
     def test_empty_sections_list(self) -> None:
         text = format_for_matrix([])
+        self.assertIn("Alles erledigt", text)
+
+
+class GetProjectTodosTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        # Create two fake projects with TODO.md
+        for proj_name in ("alpha", "beta"):
+            proj_dir = Path(self.tmp.name) / proj_name
+            proj_dir.mkdir()
+            (proj_dir / "TODO.md").write_text(SAMPLE, encoding="utf-8")
+        # gamma has no TODO.md
+        (Path(self.tmp.name) / "gamma").mkdir()
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _projects_dict(self) -> dict:
+        return {
+            "alpha": {"local_path": str(Path(self.tmp.name) / "alpha")},
+            "beta":  {"local_path": str(Path(self.tmp.name) / "beta")},
+            "gamma": {"local_path": str(Path(self.tmp.name) / "gamma")},
+        }
+
+    def test_only_projects_with_todo_included(self) -> None:
+        result = get_project_todos(self._projects_dict())
+        self.assertIn("alpha", result)
+        self.assertIn("beta", result)
+        self.assertNotIn("gamma", result)
+
+    def test_sections_parsed_correctly(self) -> None:
+        result = get_project_todos(self._projects_dict())
+        self.assertEqual(len(result["alpha"]), 3)
+
+    def test_missing_local_path_skipped(self) -> None:
+        projects = {"empty": {"local_path": ""}}
+        result = get_project_todos(projects)
+        self.assertEqual(result, {})
+
+    def test_accepts_dataclass_like_objects(self) -> None:
+        """get_project_todos should work with objects having local_path attribute."""
+        class FakeProj:
+            def __init__(self, path: str) -> None:
+                self.local_path = path
+
+        projects = {
+            "alpha": FakeProj(str(Path(self.tmp.name) / "alpha")),
+            "gamma": FakeProj(str(Path(self.tmp.name) / "gamma")),
+        }
+        result = get_project_todos(projects)
+        self.assertIn("alpha", result)
+        self.assertNotIn("gamma", result)
+
+
+class FormatProjectSummaryTests(unittest.TestCase):
+    def _make_todos(self) -> dict:
+        sections = parse_todo_file(_write(SAMPLE))
+        return {"alpha": sections, "beta": [TodoSection(priority="P0", title="Done", open_items=[], done_count=3)]}
+
+    def test_shows_project_names(self) -> None:
+        text = format_project_summary(self._make_todos())
+        self.assertIn("alpha", text)
+        self.assertIn("beta", text)
+
+    def test_shows_open_counts(self) -> None:
+        text = format_project_summary(self._make_todos())
+        # alpha has 4 open items per SAMPLE
+        self.assertIn("4 offen", text)
+
+    def test_all_done_project_shows_checkmark(self) -> None:
+        text = format_project_summary(self._make_todos())
+        self.assertIn("alles erledigt", text)
+
+    def test_empty_dict_returns_fallback(self) -> None:
+        text = format_project_summary({})
+        self.assertIn("gefunden", text)
+
+
+class FormatProjectDetailTests(unittest.TestCase):
+    def test_shows_project_name_in_header(self) -> None:
+        sections = parse_todo_file(_write(SAMPLE))
+        text = format_project_detail("MyProject", sections)
+        self.assertIn("MyProject", text)
+
+    def test_shows_open_count(self) -> None:
+        sections = parse_todo_file(_write(SAMPLE))
+        text = format_project_detail("MyProject", sections)
+        self.assertIn("4 offen", text)
+
+    def test_all_done_shows_checkmark(self) -> None:
+        sections = [TodoSection(priority="P0", title="Done", open_items=[], done_count=2)]
+        text = format_project_detail("MyProject", sections)
         self.assertIn("Alles erledigt", text)
 
 

@@ -471,6 +471,39 @@ async def save_claude_md(
     )
 
 
+@app.get("/projects/{name}/todos", response_class=HTMLResponse)
+async def project_todos_partial(request: Request, name: str):
+    """HTMX partial: open TODO items for a single project."""
+    proj = _registry().projects.get(name)
+    if not proj:
+        return HTMLResponse("<p class='text-xs text-drac-comment italic'>Projekt nicht gefunden.</p>")
+    sections = _parse_todo(Path(proj.local_path) / "TODO.md") if proj.local_path else []
+    return templates.TemplateResponse("partials/project_todos.html", {
+        "request":  request,
+        "name":     name,
+        "sections": sections,
+    })
+
+
+@app.get("/api/todos/projects")
+async def api_todos_projects():
+    """Return open TODO counts for all registered projects."""
+    result = []
+    for name, proj in _registry().projects.items():
+        if not proj.local_path:
+            continue
+        proj_sections = _parse_todo(Path(proj.local_path) / "TODO.md")
+        open_count = sum(len(s.open_items) for s in proj_sections)
+        done_count = sum(s.done_count for s in proj_sections)
+        result.append({
+            "name":       name,
+            "open_count": open_count,
+            "done_count": done_count,
+            "has_todo":   bool(proj_sections),
+        })
+    return JSONResponse(sorted(result, key=lambda x: (-x["open_count"], x["name"])))
+
+
 @app.delete("/projects/{name}", response_class=HTMLResponse)
 async def remove_project(request: Request, name: str):
     _registry().remove(name)
@@ -573,7 +606,28 @@ async def jobs_page(request: Request):
 @app.get("/todos", response_class=HTMLResponse)
 async def todos_page(request: Request):
     sections = _parse_todo(TODO_FILE)
-    return templates.TemplateResponse("todos.html", {"request": request, "sections": sections})
+    # Collect per-project TODO summaries
+    project_todos: list[dict] = []
+    for name, proj in _registry().projects.items():
+        if not proj.local_path:
+            continue
+        proj_sections = _parse_todo(Path(proj.local_path) / "TODO.md")
+        if not proj_sections:
+            continue
+        open_count = sum(len(s.open_items) for s in proj_sections)
+        done_count = sum(s.done_count for s in proj_sections)
+        project_todos.append({
+            "name":       name,
+            "open_count": open_count,
+            "done_count": done_count,
+            "sections":   proj_sections,
+        })
+    project_todos.sort(key=lambda x: (-x["open_count"], x["name"]))
+    return templates.TemplateResponse("todos.html", {
+        "request":       request,
+        "sections":      sections,
+        "project_todos": project_todos,
+    })
 
 
 @app.get("/api/todos")

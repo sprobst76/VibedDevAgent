@@ -98,3 +98,72 @@ def format_for_matrix(sections: list[TodoSection]) -> str:
         lines.append("")
 
     return "\n".join(lines).rstrip()
+
+
+def get_project_todos(projects: dict) -> dict[str, list[TodoSection]]:
+    """Read TODO.md for each project and return name → sections mapping.
+
+    *projects* may be a dict of Project dataclass instances or raw dicts
+    — both are accepted as long as they expose ``local_path``.
+    Only projects that actually have a non-empty TODO.md are included.
+    """
+    result: dict[str, list[TodoSection]] = {}
+    for name, proj in projects.items():
+        local_path = (
+            proj.local_path
+            if hasattr(proj, "local_path")
+            else proj.get("local_path", "")
+        )
+        if not local_path:
+            continue
+        sections = parse_todo_file(Path(local_path) / "TODO.md")
+        if sections:
+            result[name] = sections
+    return result
+
+
+def format_project_summary(project_todos: dict[str, list[TodoSection]]) -> str:
+    """Return a compact Matrix summary: open count per project."""
+    if not project_todos:
+        return "📋 Keine Projekte mit TODO.md gefunden."
+
+    total_open = sum(
+        sum(len(s.open_items) for s in secs) for secs in project_todos.values()
+    )
+    lines: list[str] = [
+        f"📋 **Projekt-TODO-Übersicht** — {total_open} offen gesamt",
+        "",
+    ]
+    for name in sorted(project_todos):
+        sections = project_todos[name]
+        open_count = sum(len(s.open_items) for s in sections)
+        done_count = sum(s.done_count for s in sections)
+        if open_count == 0:
+            lines.append(f"✅ **{name}** — alles erledigt ({done_count} gesamt)")
+        else:
+            lines.append(f"📌 **{name}** — {open_count} offen, {done_count} erledigt")
+    return "\n".join(lines)
+
+
+def format_project_detail(name: str, sections: list[TodoSection]) -> str:
+    """Return a detailed Matrix overview of one project's open TODOs."""
+    total_open = sum(len(s.open_items) for s in sections)
+    total_done = sum(s.done_count for s in sections)
+    lines: list[str] = [
+        f"📋 **TODOs: {name}** — {total_open} offen, {total_done} erledigt",
+        "",
+    ]
+    open_sections = [s for s in sections if s.open_items]
+    if not open_sections:
+        lines.append("✅ Alles erledigt!")
+        return "\n".join(lines)
+
+    for section in open_sections:
+        lines.append(
+            f"{section.emoji} **{section.priority}** — {len(section.open_items)} offen:"
+        )
+        for item in section.open_items:
+            short = item if len(item) <= 80 else item[:77] + "…"
+            lines.append(f"  • {short}")
+        lines.append("")
+    return "\n".join(lines).rstrip()

@@ -4,19 +4,9 @@
 {% block content %}
 <div class="space-y-6">
 
-  <!-- Header + summary -->
+  <!-- Header -->
   <div class="flex items-center justify-between flex-wrap gap-3">
-    <div>
-      <h1 class="text-xl font-bold tracking-tight text-drac-fg">TODOs</h1>
-      <p class="text-xs text-drac-comment mt-0.5">
-        {% set ns = namespace(open=0, done=0) %}
-        {% for s in sections %}
-          {% set ns.open = ns.open + (s.open_items | length) %}
-          {% set ns.done = ns.done + s.done_count %}
-        {% endfor %}
-        {{ ns.open }} offen · {{ ns.done }} erledigt · {{ ns.open + ns.done }} gesamt
-      </p>
-    </div>
+    <h1 class="text-xl font-bold tracking-tight text-drac-fg">TODOs</h1>
     <a href="https://github.com/sprobst76/VibedDevAgent/blob/main/TODO.md"
        target="_blank"
        class="text-xs text-drac-comment hover:text-drac-fg border border-drac-line hover:border-drac-comment
@@ -25,8 +15,43 @@
     </a>
   </div>
 
-  <!-- Priority sections -->
-  <div class="space-y-4">
+  <!-- Tab bar -->
+  <div class="flex gap-1 border-b border-drac-line">
+    <button onclick="switchTab('devagent')" id="tab-devagent"
+            class="px-4 py-2 text-sm font-medium transition-colors rounded-t-lg
+                   text-drac-fg bg-drac-surface border border-b-0 border-drac-line -mb-px">
+      DevAgent
+      {% set ns = namespace(open=0) %}
+      {% for s in sections %}{% set ns.open = ns.open + (s.open_items | length) %}{% endfor %}
+      {% if ns.open > 0 %}
+        <span class="ml-1.5 bg-drac-orange/20 text-drac-orange text-[10px] font-bold rounded-full px-1.5 py-0.5">{{ ns.open }}</span>
+      {% endif %}
+    </button>
+    <button onclick="switchTab('projekte')" id="tab-projekte"
+            class="px-4 py-2 text-sm font-medium transition-colors rounded-t-lg
+                   text-drac-comment hover:text-drac-fg">
+      Projekte
+      {% set proj_open = namespace(count=0) %}
+      {% for p in project_todos %}{% set proj_open.count = proj_open.count + p.open_count %}{% endfor %}
+      {% if proj_open.count > 0 %}
+        <span class="ml-1.5 bg-drac-orange/20 text-drac-orange text-[10px] font-bold rounded-full px-1.5 py-0.5">{{ proj_open.count }}</span>
+      {% elif project_todos %}
+        <span class="ml-1.5 bg-drac-green/20 text-drac-green text-[10px] font-bold rounded-full px-1.5 py-0.5">✓</span>
+      {% endif %}
+    </button>
+  </div>
+
+  <!-- Panel: DevAgent TODOs -->
+  <div id="panel-devagent" class="space-y-4">
+    {% set ns = namespace(open=0, done=0) %}
+    {% for s in sections %}
+      {% set ns.open = ns.open + (s.open_items | length) %}
+      {% set ns.done = ns.done + s.done_count %}
+    {% endfor %}
+    <p class="text-xs text-drac-comment -mt-4">
+      {{ ns.open }} offen · {{ ns.done }} erledigt · {{ ns.open + ns.done }} gesamt
+    </p>
+
     {% for section in sections %}
     {% set open_count = section.open_items | length %}
     {% set pct = ((section.done_count / section.total * 100) | int) if section.total > 0 else 100 %}
@@ -37,7 +62,6 @@
       <button onclick="toggleSection('sec-{{ loop.index }}')"
               class="w-full flex items-center justify-between px-5 py-4 hover:bg-drac-line/20 transition-colors group">
         <div class="flex items-center gap-3">
-          <!-- Priority badge -->
           {% if section.priority == 'P0' %}
             <span class="text-xs font-bold bg-drac-cyan/10 text-drac-cyan border border-drac-cyan/30 rounded-full px-2.5 py-0.5">{{ section.priority }}</span>
           {% elif section.priority == 'P1' %}
@@ -49,12 +73,9 @@
           {% else %}
             <span class="text-xs font-bold bg-drac-orange/10 text-drac-orange border border-drac-orange/30 rounded-full px-2.5 py-0.5">{{ section.priority }}</span>
           {% endif %}
-
           <span class="text-sm font-medium text-drac-fg">{{ section.title }}</span>
         </div>
-
         <div class="flex items-center gap-4 shrink-0">
-          <!-- Stats -->
           <span class="text-xs text-drac-comment">
             {{ section.done_count }}/{{ section.total }}
             {% if open_count > 0 %}
@@ -63,7 +84,6 @@
               · <span class="text-drac-green">✓ fertig</span>
             {% endif %}
           </span>
-          <!-- Chevron -->
           <span id="chev-{{ loop.index }}" class="text-drac-comment text-xs transition-transform">▼</span>
         </div>
       </button>
@@ -78,19 +98,15 @@
         </div>
       </div>
 
-      <!-- Items (collapsible) -->
+      <!-- Items -->
       <div id="sec-{{ loop.index }}" class="{% if open_count == 0 and section.done_count > 0 %}hidden{% endif %}">
         <div class="px-5 py-3 space-y-1">
-
-          <!-- Open items -->
           {% for item in section.open_items %}
           <div class="flex items-start gap-2.5 py-1 text-xs">
             <span class="mt-0.5 w-4 h-4 shrink-0 rounded border border-drac-line flex items-center justify-center"></span>
             <span class="text-drac-fg">{{ item }}</span>
           </div>
           {% endfor %}
-
-          <!-- Done placeholder (collapsed summary) -->
           {% if section.done_count > 0 %}
           <div class="flex items-center gap-2 pt-1 mt-1 border-t border-drac-line/40">
             <span class="text-xs text-drac-comment">
@@ -98,7 +114,6 @@
             </span>
           </div>
           {% endif %}
-
         </div>
       </div>
 
@@ -106,15 +121,116 @@
     {% endfor %}
   </div>
 
+  <!-- Panel: Projekte TODOs -->
+  <div id="panel-projekte" class="hidden space-y-4">
+    {% if project_todos %}
+      {% for proj in project_todos %}
+      <div class="bg-drac-surface border border-drac-line rounded-xl overflow-hidden shadow-sm">
+
+        <!-- Project header -->
+        <button onclick="toggleSection('proj-{{ loop.index }}')"
+                class="w-full flex items-center justify-between px-5 py-4 hover:bg-drac-line/20 transition-colors">
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-semibold text-drac-fg">{{ proj.name }}</span>
+          </div>
+          <div class="flex items-center gap-4 shrink-0">
+            <span class="text-xs text-drac-comment">
+              {{ proj.done_count }}/{{ proj.open_count + proj.done_count }}
+              {% if proj.open_count > 0 %}
+                · <span class="text-drac-orange">{{ proj.open_count }} offen</span>
+              {% else %}
+                · <span class="text-drac-green">✓ fertig</span>
+              {% endif %}
+            </span>
+            <span id="chev-proj-{{ loop.index }}" class="text-drac-comment text-xs transition-transform">▼</span>
+          </div>
+        </button>
+
+        <!-- Progress bar -->
+        {% set total = proj.open_count + proj.done_count %}
+        {% set pct = ((proj.done_count / total * 100) | int) if total > 0 else 100 %}
+        <div class="h-1 bg-drac-line/40">
+          <div class="h-1 transition-all duration-500 {% if proj.open_count == 0 %}bg-drac-green{% else %}bg-drac-purple{% endif %}"
+               style="width: {{ pct }}%">
+          </div>
+        </div>
+
+        <!-- Sections (collapsible) -->
+        <div id="proj-{{ loop.index }}" class="{% if proj.open_count == 0 %}hidden{% endif %}">
+          <div class="px-5 py-3 space-y-3">
+            {% for section in proj.sections if section.open_items %}
+            <div>
+              <p class="text-xs font-semibold mb-1">
+                <span class="
+                  {% if section.priority == 'P0' %}text-drac-cyan
+                  {% elif section.priority == 'P1' %}text-drac-green
+                  {% elif section.priority == 'P1-SECURITY' %}text-drac-red
+                  {% elif section.priority == 'P2' %}text-drac-purple
+                  {% else %}text-drac-orange{% endif %}">
+                  {{ section.priority }}
+                </span>
+                <span class="text-drac-comment font-normal"> — {{ section.title }}</span>
+                <span class="text-drac-comment font-normal ml-1">({{ section.open_items | length }} offen)</span>
+              </p>
+              <div class="space-y-1 pl-1">
+                {% for item in section.open_items %}
+                <div class="flex items-start gap-2 text-xs">
+                  <span class="mt-0.5 w-3.5 h-3.5 shrink-0 rounded border border-drac-line flex items-center justify-center"></span>
+                  <span class="text-drac-fg leading-relaxed">{{ item }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+            {% if proj.open_count == 0 %}
+            <p class="text-xs text-drac-green">✅ Alle TODOs erledigt!</p>
+            {% endif %}
+            {% if proj.done_count > 0 and proj.open_count > 0 %}
+            <p class="text-xs text-drac-comment border-t border-drac-line/40 pt-2">
+              {{ proj.done_count }} erledigt{{ 'e Items' if proj.done_count != 1 else 'es Item' }} ausgeblendet
+            </p>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="bg-drac-surface border border-drac-line rounded-xl p-8 text-center">
+        <p class="text-drac-comment text-sm">Keine registrierten Projekte mit TODO.md gefunden.</p>
+        <a href="/" class="text-xs text-drac-purple hover:text-[#a57ee8] mt-2 inline-block">Projekte verwalten →</a>
+      </div>
+    {% endif %}
+  </div>
+
 </div>
 
 <script>
 function toggleSection(id) {
   const el   = document.getElementById(id);
-  const idx  = id.split('-')[1];
-  const chev = document.getElementById('chev-' + idx);
+  const isProjChev = id.startsWith('proj-');
+  const idx  = isProjChev ? id.replace('proj-', '') : id.split('-')[1];
+  const chevId = isProjChev ? 'chev-proj-' + idx : 'chev-' + idx;
+  const chev = document.getElementById(chevId);
   const hidden = el.classList.toggle('hidden');
-  chev.style.transform = hidden ? 'rotate(-90deg)' : '';
+  if (chev) chev.style.transform = hidden ? 'rotate(-90deg)' : '';
+}
+
+function switchTab(tab) {
+  const panels = ['devagent', 'projekte'];
+  panels.forEach(t => {
+    const panel = document.getElementById('panel-' + t);
+    const btn   = document.getElementById('tab-' + t);
+    if (t === tab) {
+      panel.classList.remove('hidden');
+      btn.classList.add('text-drac-fg', 'bg-drac-surface', 'border', 'border-b-0', 'border-drac-line', '-mb-px');
+      btn.classList.remove('text-drac-comment', 'hover:text-drac-fg');
+    } else {
+      panel.classList.add('hidden');
+      btn.classList.remove('text-drac-fg', 'bg-drac-surface', 'border', 'border-b-0', 'border-drac-line', '-mb-px');
+      btn.classList.add('text-drac-comment', 'hover:text-drac-fg');
+    }
+  });
 }
 </script>
 {% endblock %}

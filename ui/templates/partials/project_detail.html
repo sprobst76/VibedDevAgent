@@ -93,5 +93,18 @@
       {% endif %}
     </div>
 
+    <!-- TODOs -->
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-semibold text-drac-comment uppercase tracking-wider">TODOs</h3>
+        <a href="/todos" class="text-xs text-drac-purple hover:text-[#a57ee8] transition-colors">Alle →</a>
+      </div>
+      <div hx-get="/projects/{{ name }}/todos"
+           hx-trigger="load"
+           hx-swap="innerHTML">
+        <p class="text-xs text-drac-comment">Lädt…</p>
+      </div>
+    </div>
+
   </div>
 </div>

@@ -25,6 +25,9 @@ from core.job_service import JobService
 from core.models import JobState
 from core.security import parse_allowed_users
 from core.todo_parser import format_for_matrix as _todo_format
+from core.todo_parser import format_project_detail as _todo_project_detail
+from core.todo_parser import format_project_summary as _todo_project_summary
+from core.todo_parser import get_project_todos as _get_project_todos
 from core.todo_parser import parse_todo_file as _parse_todo
 from core.watchdog import JobWatchdog
 from core.worktree_manager import WorktreeManager
@@ -324,7 +327,7 @@ class MatrixWorker:
                 self._handle_cancel(event)
             elif lower == "!help":
                 self._handle_help(event)
-            elif lower == "!todo" or lower == "!todos":
+            elif lower in ("!todo", "!todos") or lower.startswith(("!todo ", "!todos ")):
                 self._handle_todo(event)
             elif self._is_ai_message(event):
                 self._handle_ai_message(event)
@@ -535,26 +538,95 @@ class MatrixWorker:
                 "`!ai @<repo> <aufgabe>` — In spezifischem Repo ausführen\n"
                 "`!status` — Worker-Status anzeigen\n"
                 "`!cancel` — Laufenden Task abbrechen\n"
-                "`!todo` — Offene TODOs anzeigen\n"
+                "`!todo` — Offene TODOs aller Projekte\n"
+                "`!todo @<projekt>` — TODOs eines Projekts anzeigen\n"
                 "`!help` — Diese Hilfe"
             ),
         )
 
     def _handle_todo(self, event: dict[str, Any]) -> None:
         room_id = str(event.get("room_id", self.config.room_id))
-        todo_path = self.config.todo_file or str(
-            Path(__file__).parent.parent / "TODO.md"
-        )
-        sections = _parse_todo(todo_path)
-        if not sections:
+        content = event.get("content", {})
+        body = str(content.get("body", "")).strip() if isinstance(content, dict) else ""
+
+        # Parse optional @project argument: "!todo @MyProject"
+        parts = body.split(None, 1)
+        project_arg = parts[1].strip() if len(parts) > 1 else ""
+
+        if project_arg.startswith("@"):
+            self._handle_todo_project(room_id, project_arg[1:])
+        else:
+            self._handle_todo_summary(room_id)
+
+    def _handle_todo_project(self, room_id: str, project_name: str) -> None:
+        """Show TODOs for a specific registered project."""
+        try:
+            path = Path(self.config.projects_file)
+            if not path.exists():
+                self.client.send_notice(room_id=room_id, body="⚠️ Projekt-Registry nicht gefunden.")
+                return
+            data = json.loads(path.read_text(encoding="utf-8"))
+            proj = data.get("projects", {}).get(project_name)
+            if not proj:
+                self.client.send_notice(
+                    room_id=room_id,
+                    body=f"❌ Projekt «{project_name}» nicht gefunden.",
+                )
+                return
+            local_path = proj.get("local_path", "")
+            if not local_path:
+                self.client.send_notice(
+                    room_id=room_id,
+                    body=f"⚠️ Kein lokaler Pfad für «{project_name}» konfiguriert.",
+                )
+                return
+            sections = _parse_todo(Path(local_path) / "TODO.md")
+            if not sections:
+                self.client.send_notice(
+                    room_id=room_id,
+                    body=f"📋 Kein TODO.md für «{project_name}» gefunden.",
+                )
+                return
+            text = _todo_project_detail(project_name, sections)
+            for chunk in self._split_for_matrix(text):
+                self.client.send_notice(room_id=room_id, body=chunk)
+        except Exception:
+            log.exception("failed to read project TODOs for %s", project_name)
             self.client.send_notice(
                 room_id=room_id,
-                body="⚠️ TODO.md nicht gefunden oder leer.",
+                body=f"⚠️ Fehler beim Lesen der TODOs für «{project_name}».",
             )
-            return
-        text = _todo_format(sections)
-        for chunk in self._split_for_matrix(text):
-            self.client.send_notice(room_id=room_id, body=chunk)
+
+    def _handle_todo_summary(self, room_id: str) -> None:
+        """Show a summary of open TODOs across all registered projects."""
+        try:
+            path = Path(self.config.projects_file)
+            projects: dict = {}
+            if path.exists():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                projects = data.get("projects", {})
+
+            if not projects:
+                # Fallback: show DevAgent's own TODO.md
+                todo_path = self.config.todo_file or str(
+                    Path(__file__).parent.parent / "TODO.md"
+                )
+                sections = _parse_todo(todo_path)
+                if not sections:
+                    self.client.send_notice(room_id=room_id, body="⚠️ TODO.md nicht gefunden oder leer.")
+                    return
+                text = _todo_format(sections)
+                for chunk in self._split_for_matrix(text):
+                    self.client.send_notice(room_id=room_id, body=chunk)
+                return
+
+            project_todos = _get_project_todos(projects)
+            text = _todo_project_summary(project_todos)
+            for chunk in self._split_for_matrix(text):
+                self.client.send_notice(room_id=room_id, body=chunk)
+        except Exception:
+            log.exception("failed to build project todo summary")
+            self.client.send_notice(room_id=room_id, body="⚠️ Fehler beim Lesen der Projekt-TODOs.")
 
     # ── Output splitting ──────────────────────────────────────────────────────
 

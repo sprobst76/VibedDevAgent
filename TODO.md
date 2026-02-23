@@ -219,11 +219,6 @@ touch docs/event-push.md
 - [ ] Jeder Backend liefert `/api/health` + `/api/projects` + `/api/jobs`
 - [ ] Aggregierte Ansicht aller Backends in einem Frontend
 
-### 20) Kein `!ai`-Prefix in Projekt-Räumen (opt-in)
-- [ ] Per CLAUDE.md oder projects.json: `auto_reply: true` für einen Raum
-- [ ] Jede Nachricht von erlaubten Usern wird direkt an Claude weitergeleitet
-- [ ] Mention-Gating als Alternative (nur bei @devagent-bot)
-
 ### 21) Scheduled Tasks
 - [ ] `!schedule "täglich 09:00" <aufgabe>` — Cron-ähnliche Tasks pro Raum
 - [ ] Gespeichert in SQLite oder JSON
@@ -241,3 +236,10 @@ touch docs/event-push.md
 - [x] Web UI: Projekt-Detail-Panel (`partials/project_detail.html`) zeigt offene TODO-Items
 - [x] Web UI: `/todos`-Seite bekommt Tab-Wechsel "DevAgent" / "Projekte"
 - [x] Fallback: kein TODO.md im Projekt → Hinweis statt Fehler
+
+## P4 — Zurückgestellt / Nice-to-have
+
+### 20) Kein `!ai`-Prefix in Projekt-Räumen (opt-in)
+- [ ] Per CLAUDE.md oder projects.json: `auto_reply: true` für einen Raum
+- [ ] Jede Nachricht von erlaubten Usern wird direkt an Claude weitergeleitet
+- [ ] Mention-Gating als Alternative (nur bei @devagent-bot)

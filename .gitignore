@@ -12,6 +12,9 @@ state/
 # Systemd service units (contain local paths/usernames — use *.service.example as template)
 ops/systemd/*.service
 
+# Claude Code — local settings (may contain machine-specific paths or secrets)
+.claude/settings.local.json
+
 # OS/editor
 .DS_Store
 .vscode/

@@ -243,6 +243,7 @@ touch docs/event-push.md
 - [x] `deny`-Regeln: `ssh*`, `rm -rf /home*`, `/srv*`, `/root*`, `shutdown*`
 - [x] `settings.local.json` bereinigt (war ~60 Zeilen Müll → 4 sudo-Einträge)
 - [x] `.claude/settings.local.json` in `.gitignore` eingetragen
+- [x] Explizite `git add*`/`commit*`/`push*`-Einträge in `settings.json` (kein Permission-Prompt)
 
 ## P4 — Zurückgestellt / Nice-to-have
 

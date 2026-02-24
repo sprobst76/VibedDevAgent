@@ -200,14 +200,14 @@ touch docs/event-push.md
 ## P3 — AI Agent Verbesserungen (priorisiert 2026-02)
 
 ### 16) Token Auto-Refresh
-- [ ] Bei 401-Fehler im Worker: automatisch `matrix_login.sh` aufrufen oder Refresh-Token-Flow implementieren
-- [ ] Alternativ: Cronjob der `matrix_login.sh operator` täglich ausführt
-- [ ] Ziel: kein manueller Token-Wechsel mehr nötig
+- [x] Startup-Warning wenn `MATRIX_USER_DEVAGENT`/`MATRIX_PASSWORD_DEVAGENT` fehlen
+- [x] Auto-Relogin bei 401 bereits in `adapters/matrix/client.py` implementiert
+- [ ] Cronjob als zusätzliche Absicherung (`matrix_login.sh operator` täglich)
 
 ### 17) Lange Antworten aufteilen
-- [ ] Claude-Ausgaben > 3800 Zeichen in mehrere Matrix-Nachrichten splitten (sinnvolle Trennung nach Absätzen)
-- [ ] Alternativ: als Matrix-File-Upload (m.file event)
-- [ ] MAX_OUTPUT_CHARS in .env konfigurierbar machen
+- [x] Splitting bei `\n\n`-Grenzen implementiert (`_split_for_matrix`, max 3800 Zeichen)
+- [x] Smart hard-cut: bevorzugt Zeilen- dann Wortgrenzen
+- [ ] `MAX_OUTPUT_CHARS` in `.env` konfigurierbar machen
 
 ### 18) Live-Log im Browser
 - [x] Server-Sent Events Endpoint `/api/logs/stream`
@@ -236,6 +236,13 @@ touch docs/event-push.md
 - [x] Web UI: Projekt-Detail-Panel (`partials/project_detail.html`) zeigt offene TODO-Items
 - [x] Web UI: `/todos`-Seite bekommt Tab-Wechsel "DevAgent" / "Projekte"
 - [x] Fallback: kein TODO.md im Projekt → Hinweis statt Fehler
+
+### 24) Claude Code Permissions aufräumen ✓
+- [x] `.claude/settings.json` anlegen (committed, Agent/LLM-Template)
+- [x] `rm` auf Projektpfad + `/tmp/VibedDevAgent*` eingeschränkt
+- [x] `deny`-Regeln: `ssh*`, `rm -rf /home*`, `/srv*`, `/root*`, `shutdown*`
+- [x] `settings.local.json` bereinigt (war ~60 Zeilen Müll → 4 sudo-Einträge)
+- [x] `.claude/settings.local.json` in `.gitignore` eingetragen
 
 ## P4 — Zurückgestellt / Nice-to-have
 

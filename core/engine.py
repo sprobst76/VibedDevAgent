@@ -19,7 +19,8 @@ log = logging.getLogger(__name__)
 class JobRecord:
     job_id: str
     state: JobState
-    started_at: float = field(default=0.0)  # epoch seconds; set when RUNNING
+    started_at: float = field(default=0.0)       # epoch seconds; set when RUNNING
+    wait_approval_at: float = field(default=0.0)  # epoch seconds; set when WAIT_APPROVAL
 
 
 class DevAgentEngine:
@@ -40,6 +41,10 @@ class DevAgentEngine:
         """Return all jobs currently in RUNNING state."""
         return [j for j in self.jobs.values() if j.state == JobState.RUNNING]
 
+    def waiting_jobs(self) -> list[JobRecord]:
+        """Return all jobs currently in WAIT_APPROVAL state."""
+        return [j for j in self.jobs.values() if j.state == JobState.WAIT_APPROVAL]
+
     def fail_job(self, job_id: str) -> None:
         """Force-transition a job to FAILED (watchdog path, bypasses state machine)."""
         job = self.jobs.get(job_id)
@@ -52,6 +57,7 @@ class DevAgentEngine:
         # MVP bootstrap: planning is represented as a quick internal step.
         record.state = JobState.PLANNING
         record.state = JobState.WAIT_APPROVAL
+        record.wait_approval_at = time.time()
         return record
 
     def get_job(self, job_id: str) -> JobRecord:

@@ -57,6 +57,7 @@ class MatrixWorkerConfig:
     claude_bin: str = "claude"
     ai_timeout_seconds: int = 120
     max_job_seconds: int = 7200
+    max_wait_approval_seconds: int = 3600  # WAIT_APPROVAL timeout (1h default)
     relogin_user: str = ""
     relogin_password: str = ""
     relogin_env_file: str = "/srv/devagent/.env"
@@ -159,6 +160,7 @@ class MatrixWorker:
                 room_id_for=self._room_id_for_job,
                 notify_fn=lambda room_id, msg: self.client.send_notice(room_id=room_id, body=msg),
                 max_job_seconds=config.max_job_seconds,
+                max_wait_seconds=config.max_wait_approval_seconds,
             )
             self._watchdog.start()
         else:
@@ -1036,6 +1038,7 @@ def load_config_from_env() -> MatrixWorkerConfig:
         schedules_file=os.getenv("DEVAGENT_SCHEDULES_FILE", ""),
         use_pty=os.getenv("DEVAGENT_USE_PTY", "0") not in {"0", "false", "False", ""},
         proactive_todos=os.getenv("DEVAGENT_PROACTIVE_TODOS", "0") not in {"0", "false", "False", ""},
+        max_wait_approval_seconds=int(os.getenv("DEVAGENT_MAX_WAIT_APPROVAL_SECONDS", "3600")),
     )
 
 

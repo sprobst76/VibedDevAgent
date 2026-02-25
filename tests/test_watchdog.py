@@ -10,7 +10,10 @@ from core.models import JobState
 from core.watchdog import JobWatchdog
 
 
-def _make_watchdog(engine, tmux, room_id_for=None, notify_fn=None, max_job_seconds=3600):
+def _make_watchdog(
+    engine, tmux, room_id_for=None, notify_fn=None,
+    max_job_seconds=3600, max_wait_seconds=3600,
+):
     if room_id_for is None:
         room_id_for = lambda job_id: f"!room-for-{job_id}:example.org"  # noqa: E731
     if notify_fn is None:
@@ -22,6 +25,7 @@ def _make_watchdog(engine, tmux, room_id_for=None, notify_fn=None, max_job_secon
         notify_fn=notify_fn,
         check_interval=9999,   # never fires automatically in tests
         max_job_seconds=max_job_seconds,
+        max_wait_seconds=max_wait_seconds,
     )
 
 
@@ -127,6 +131,128 @@ class TestWatchdogTerminalJobsSkipped(unittest.TestCase):
         wd._check_once()
 
         tmux.session_exists.assert_not_called()
+
+
+def _engine_with_waiting_job(job_id: str, wait_approval_at: float | None = None) -> DevAgentEngine:
+    engine = DevAgentEngine()
+    record = engine.create_job(job_id)
+    record.state = JobState.WAIT_APPROVAL
+    if wait_approval_at is not None:
+        record.wait_approval_at = wait_approval_at
+    return engine
+
+
+class TestWatchdogWaitApprovalTimeout(unittest.TestCase):
+
+    def test_expired_wait_approval_is_failed_and_notified(self):
+        old_time = time.time() - 3601
+        engine = _engine_with_waiting_job("w1", wait_approval_at=old_time)
+        tmux = MagicMock()
+        notify = MagicMock()
+        wd = _make_watchdog(engine, tmux, notify_fn=notify, max_wait_seconds=3600)
+
+        wd._check_once()
+
+        self.assertEqual(engine.jobs["w1"].state, JobState.FAILED)
+        notify.assert_called_once()
+        args = notify.call_args[0]
+        self.assertIn("w1", args[1])
+
+    def test_recent_wait_approval_not_touched(self):
+        engine = _engine_with_waiting_job("w2", wait_approval_at=time.time())
+        tmux = MagicMock()
+        notify = MagicMock()
+        wd = _make_watchdog(engine, tmux, notify_fn=notify, max_wait_seconds=3600)
+
+        wd._check_once()
+
+        self.assertEqual(engine.jobs["w2"].state, JobState.WAIT_APPROVAL)
+        notify.assert_not_called()
+
+    def test_wait_approval_without_timestamp_not_touched(self):
+        """wait_approval_at == 0.0 (e.g. restored from state) → skip timeout."""
+        engine = _engine_with_waiting_job("w3", wait_approval_at=0.0)
+        tmux = MagicMock()
+        notify = MagicMock()
+        wd = _make_watchdog(engine, tmux, notify_fn=notify, max_wait_seconds=1)
+
+        wd._check_once()
+
+        self.assertEqual(engine.jobs["w3"].state, JobState.WAIT_APPROVAL)
+        notify.assert_not_called()
+
+    def test_no_room_no_notify_on_expired_wait(self):
+        old_time = time.time() - 3601
+        engine = _engine_with_waiting_job("w4", wait_approval_at=old_time)
+        tmux = MagicMock()
+        notify = MagicMock()
+        wd = _make_watchdog(
+            engine, tmux,
+            room_id_for=lambda _: None,
+            notify_fn=notify,
+            max_wait_seconds=3600,
+        )
+
+        wd._check_once()
+
+        self.assertEqual(engine.jobs["w4"].state, JobState.FAILED)
+        notify.assert_not_called()
+
+    def test_expired_wait_message_contains_hours(self):
+        old_time = time.time() - 7201
+        engine = _engine_with_waiting_job("w5", wait_approval_at=old_time)
+        tmux = MagicMock()
+        notify = MagicMock()
+        wd = _make_watchdog(engine, tmux, notify_fn=notify, max_wait_seconds=7200)
+
+        wd._check_once()
+
+        msg = notify.call_args[0][1]
+        self.assertIn("2h", msg)
+
+    def test_exception_in_waiting_check_does_not_crash_watchdog(self):
+        engine = _engine_with_waiting_job("w6", wait_approval_at=time.time() - 9999)
+        # Patch fail_job to raise to simulate an unexpected error
+        original_fail = engine.fail_job
+        def _boom(job_id):
+            raise RuntimeError("fail_job exploded")
+        engine.fail_job = _boom
+        tmux = MagicMock()
+        wd = _make_watchdog(engine, tmux, max_wait_seconds=1)
+
+        with self.assertLogs("core.watchdog", level="ERROR"):
+            wd._check_once()  # must not propagate the exception
+
+
+class TestWatchdogEngineWaitingJobs(unittest.TestCase):
+    """Tests for DevAgentEngine.waiting_jobs() and wait_approval_at tracking."""
+
+    def test_waiting_jobs_returns_wait_approval_state(self):
+        engine = DevAgentEngine()
+        r = engine.create_job("e1")
+        r.state = JobState.WAIT_APPROVAL
+        self.assertEqual([r], engine.waiting_jobs())
+
+    def test_waiting_jobs_excludes_running(self):
+        engine = DevAgentEngine()
+        r = engine.create_job("e2")
+        r.state = JobState.RUNNING
+        self.assertEqual([], engine.waiting_jobs())
+
+    def test_advance_to_wait_approval_sets_timestamp(self):
+        engine = DevAgentEngine()
+        engine.create_job("e3")
+        before = time.time()
+        record = engine.advance_to_wait_approval("e3")
+        after = time.time()
+        self.assertGreaterEqual(record.wait_approval_at, before)
+        self.assertLessEqual(record.wait_approval_at, after)
+
+    def test_advance_to_wait_approval_sets_state(self):
+        engine = DevAgentEngine()
+        engine.create_job("e4")
+        record = engine.advance_to_wait_approval("e4")
+        self.assertEqual(record.state, JobState.WAIT_APPROVAL)
 
 
 class TestWatchdogExceptionIsolation(unittest.TestCase):

@@ -9,8 +9,9 @@ from typing import Callable
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_CHECK_INTERVAL = 30     # seconds between health checks
-_DEFAULT_MAX_JOB_SECONDS = 7200  # 2-hour hard cap per job
+_DEFAULT_CHECK_INTERVAL = 30      # seconds between health checks
+_DEFAULT_MAX_JOB_SECONDS = 7200   # 2-hour hard cap per running job
+_DEFAULT_MAX_WAIT_SECONDS = 3600  # 1-hour cap for unanswered approval requests
 
 
 class JobWatchdog:
@@ -31,6 +32,7 @@ class JobWatchdog:
         notify_fn: Callable[[str, str], None],
         check_interval: int = _DEFAULT_CHECK_INTERVAL,
         max_job_seconds: int = _DEFAULT_MAX_JOB_SECONDS,
+        max_wait_seconds: int = _DEFAULT_MAX_WAIT_SECONDS,
     ) -> None:
         self._engine = engine
         self._tmux = tmux
@@ -38,6 +40,7 @@ class JobWatchdog:
         self._notify = notify_fn
         self._interval = check_interval
         self._max_seconds = max_job_seconds
+        self._max_wait_seconds = max_wait_seconds
         self._stop = threading.Event()
         self._thread = threading.Thread(
             target=self._run, daemon=True, name="job-watchdog"
@@ -46,8 +49,8 @@ class JobWatchdog:
     def start(self) -> None:
         self._thread.start()
         log.info(
-            "job watchdog started (interval=%ds, max_job=%ds)",
-            self._interval, self._max_seconds,
+            "job watchdog started (interval=%ds, max_job=%ds, max_wait=%ds)",
+            self._interval, self._max_seconds, self._max_wait_seconds,
         )
 
     def stop(self) -> None:
@@ -66,6 +69,11 @@ class JobWatchdog:
                 self._check_job(job)
             except Exception:
                 log.exception("watchdog: error checking job %s", job.job_id)
+        for job in self._engine.waiting_jobs():
+            try:
+                self._check_waiting_job(job)
+            except Exception:
+                log.exception("watchdog: error checking waiting job %s", job.job_id)
 
     def _check_job(self, job) -> None:
         # --- Check 1: tmux session still alive? ---
@@ -86,6 +94,21 @@ class JobWatchdog:
             self._tmux.stop_session(job_id=job.job_id)
             self._engine.fail_job(job.job_id)
             self._send(job.job_id, f"⏱ Job `{job.job_id}` nach {hours}h Laufzeit abgebrochen.")
+
+    def _check_waiting_job(self, job) -> None:
+        if not job.wait_approval_at:
+            return
+        age = time.time() - job.wait_approval_at
+        if age > self._max_wait_seconds:
+            hours = self._max_wait_seconds // 3600
+            log.warning(
+                "watchdog: job %s waiting for approval for >%dh — cancelling", job.job_id, hours
+            )
+            self._engine.fail_job(job.job_id)
+            self._send(
+                job.job_id,
+                f"⏱ Job `{job.job_id}` nach {hours}h ohne Reaktion abgebrochen.",
+            )
 
     def _send(self, job_id: str, message: str) -> None:
         room_id = self._room_id_for(job_id)

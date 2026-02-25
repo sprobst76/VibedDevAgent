@@ -61,6 +61,7 @@ class MatrixWorkerConfig:
     relogin_env_file: str = "/srv/devagent/.env"
     todo_file: str = ""  # path to TODO.md; auto-detected if empty
     schedules_file: str = ""  # path to schedules.json; empty = scheduler disabled
+    use_pty: bool = False     # attach subprocess to a PTY (better TTY compatibility)
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -939,6 +940,7 @@ class MatrixWorker:
                 claude_bin=self.config.claude_bin,
                 timeout_seconds=self.config.ai_timeout_seconds,
                 cancel_event=cancel_event,
+                use_pty=self.config.use_pty,
             )
             status = "✅" if result.success else "❌"
             full_output = result.output
@@ -995,6 +997,7 @@ def load_config_from_env() -> MatrixWorkerConfig:
         relogin_env_file=os.getenv("DEVAGENT_ENV_FILE", "/srv/devagent/.env"),
         todo_file=os.getenv("DEVAGENT_TODO_FILE", ""),
         schedules_file=os.getenv("DEVAGENT_SCHEDULES_FILE", ""),
+        use_pty=os.getenv("DEVAGENT_USE_PTY", "0") not in {"0", "false", "False", ""},
     )
 
 

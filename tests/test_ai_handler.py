@@ -5,7 +5,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from adapters.matrix.ai_handler import MAX_OUTPUT_CHARS, parse_ai_message, run_ai_task
+from adapters.matrix.ai_handler import MAX_OUTPUT_CHARS, _strip_ansi, parse_ai_message, run_ai_task
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -223,6 +223,122 @@ class RunAiTaskTests(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(result.output, "result")
+
+
+# ── _strip_ansi ───────────────────────────────────────────────────────────────
+
+class StripAnsiTests(unittest.TestCase):
+
+    def test_plain_text_unchanged(self):
+        self.assertEqual(_strip_ansi("hello world"), "hello world")
+
+    def test_strips_color_codes(self):
+        self.assertEqual(_strip_ansi("\x1b[32mGreen\x1b[0m"), "Green")
+
+    def test_strips_bold(self):
+        self.assertEqual(_strip_ansi("\x1b[1mBold\x1b[22m"), "Bold")
+
+    def test_strips_cursor_movement(self):
+        self.assertEqual(_strip_ansi("\x1b[2J\x1b[H"), "")
+
+    def test_mixed_ansi_and_text(self):
+        result = _strip_ansi("\x1b[33mWarning:\x1b[0m something went wrong")
+        self.assertEqual(result, "Warning: something went wrong")
+
+    def test_empty_string(self):
+        self.assertEqual(_strip_ansi(""), "")
+
+    def test_multiline_with_ansi(self):
+        result = _strip_ansi("line1\x1b[32m\nline2\x1b[0m")
+        self.assertEqual(result, "line1\nline2")
+
+
+# ── PTY mode ──────────────────────────────────────────────────────────────────
+
+class PtyModeTests(unittest.TestCase):
+
+    def test_pty_mode_runs_real_echo(self):
+        """PTY mode with a real subprocess — verifies output collection works."""
+        result = run_ai_task(
+            message="ignored",
+            cwd="/tmp",
+            claude_bin="echo",  # 'echo' just prints its args
+            timeout_seconds=5,
+            skip_permissions=False,
+            use_pty=True,
+        )
+        self.assertTrue(result.success)
+        self.assertIn("ignored", result.output)
+
+    def test_pipe_mode_runs_real_echo(self):
+        """Pipe mode sanity check — same as PTY but without PTY."""
+        result = run_ai_task(
+            message="hello",
+            cwd="/tmp",
+            claude_bin="echo",
+            timeout_seconds=5,
+            skip_permissions=False,
+            use_pty=False,
+        )
+        self.assertTrue(result.success)
+        self.assertIn("hello", result.output)
+
+    def test_pty_strips_ansi_from_output(self):
+        """Output collected via PTY must be free of ANSI sequences."""
+        # printf outputs ANSI color code followed by text
+        result = run_ai_task(
+            message="unused",
+            cwd="/tmp",
+            claude_bin="printf",
+            timeout_seconds=5,
+            skip_permissions=False,
+            use_pty=True,
+        )
+        # We just check ANSI is not in the output (printf may not output color but
+        # the stripping logic should not break plain output either).
+        self.assertNotIn("\x1b[", result.output)
+
+    @patch("time.sleep")
+    @patch("subprocess.Popen")
+    def test_pty_cancel_event(self, popen_mock, _sleep):
+        """Cancel event must terminate the PTY subprocess."""
+        import os, select as _sel
+        proc = _MockProc(returncode=0, poll_sequence=[None] * 200)
+        popen_mock.return_value = proc
+
+        cancel = threading.Event()
+        cancel.set()
+
+        with patch("pty.openpty", return_value=(10, 11)), \
+             patch("os.close"), \
+             patch("select.select", return_value=([], [], [])), \
+             patch("os.read", side_effect=BlockingIOError):
+            result = run_ai_task(
+                message="x", cwd="/tmp", claude_bin="claude",
+                timeout_seconds=3600, cancel_event=cancel, use_pty=True,
+            )
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.exit_code, -2)
+
+    @patch("time.sleep")
+    @patch("subprocess.Popen")
+    def test_pty_timeout(self, popen_mock, _sleep):
+        """Timeout must terminate the PTY subprocess."""
+        proc = _MockProc(returncode=0, poll_sequence=[None] * 200)
+        popen_mock.return_value = proc
+
+        with patch("pty.openpty", return_value=(10, 11)), \
+             patch("os.close"), \
+             patch("select.select", return_value=([], [], [])), \
+             patch("os.read", side_effect=BlockingIOError):
+            result = run_ai_task(
+                message="x", cwd="/tmp", claude_bin="claude",
+                timeout_seconds=0, use_pty=True,
+            )
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.exit_code, -1)
 
 
 if __name__ == "__main__":

@@ -228,10 +228,13 @@ touch docs/event-push.md
 - [x] Daemon-Thread (`ScheduledTaskRunner`), prüft alle 30s, no double-fire
 - [x] 33 Tests in `tests/test_scheduler.py`
 
-### 22) PTY-Modus für Claude Code
-- [ ] `subprocess.Popen` mit `pty.openpty()` für bessere Kompatibilität
-- [ ] Vor allem relevant wenn `--print` entfernt wird
-- [ ] Referenz: OpenClaw coding-agent SKILL.md `pty:true`
+### 22) PTY-Modus für Claude Code ✓
+- [x] `subprocess.Popen` mit `pty.openpty()` für bessere Kompatibilität
+- [x] ANSI-Escape-Sequenzen werden automatisch gefiltert (`_strip_ansi`)
+- [x] `\r\n`-Normalisierung für PTY-Zeilenenden
+- [x] `DEVAGENT_USE_PTY=1` env-Flag (default: 0 = Pipe-Modus)
+- [x] Fallback auf Pipe-Modus wenn `pty`-Modul nicht verfügbar
+- [x] 12 neue Tests in `tests/test_ai_handler.py` (397 gesamt)
 
 ### 23) Projekt-TODO-Übersicht in Matrix und Web UI
 - [x] `todo_parser.py` erweitern: scannt `<local_path>/TODO.md` pro Projekt aus der Registry

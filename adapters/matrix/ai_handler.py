@@ -14,8 +14,9 @@ from dataclasses import dataclass
 
 log = logging.getLogger("devagent.ai_handler")
 
-# Worker splits output into Matrix-sized chunks; this is just a safety cap for huge outputs
-MAX_OUTPUT_CHARS = 65536
+# Worker splits output into Matrix-sized chunks; this is just a safety cap for huge outputs.
+# Override with DEVAGENT_MAX_OUTPUT_CHARS in .env (default: 65536).
+MAX_OUTPUT_CHARS: int = int(os.getenv("DEVAGENT_MAX_OUTPUT_CHARS", "65536"))
 
 # Matches ANSI/VT escape sequences emitted by PTY-attached processes.
 # Covers CSI sequences (ESC [ ... ) and simple two-byte ESC sequences.

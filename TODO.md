@@ -207,7 +207,7 @@ touch docs/event-push.md
 ### 17) Lange Antworten aufteilen
 - [x] Splitting bei `\n\n`-Grenzen implementiert (`_split_for_matrix`, max 3800 Zeichen)
 - [x] Smart hard-cut: bevorzugt Zeilen- dann Wortgrenzen
-- [ ] `MAX_OUTPUT_CHARS` in `.env` konfigurierbar machen
+- [x] `MAX_OUTPUT_CHARS` in `.env` konfigurierbar machen (`DEVAGENT_MAX_OUTPUT_CHARS`, default 65536)
 
 ### 18) Live-Log im Browser
 - [x] Server-Sent Events Endpoint `/api/logs/stream`

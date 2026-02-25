@@ -24,6 +24,7 @@ from core.engine import DevAgentEngine
 from core.job_service import JobService
 from core.models import JobState
 from core.security import parse_allowed_users
+from core.scheduler import ScheduledTaskRunner, parse_schedule_expr
 from core.todo_parser import format_for_matrix as _todo_format
 from core.todo_parser import format_project_detail as _todo_project_detail
 from core.todo_parser import format_project_summary as _todo_project_summary
@@ -59,6 +60,7 @@ class MatrixWorkerConfig:
     relogin_password: str = ""
     relogin_env_file: str = "/srv/devagent/.env"
     todo_file: str = ""  # path to TODO.md; auto-detected if empty
+    schedules_file: str = ""  # path to schedules.json; empty = scheduler disabled
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -159,6 +161,16 @@ class MatrixWorker:
         else:
             self._watchdog = None
 
+        # Scheduled task runner
+        if config.schedules_file:
+            self._scheduler: ScheduledTaskRunner | None = ScheduledTaskRunner(
+                state_file=config.schedules_file,
+                fire_fn=self._run_scheduled_task,
+            )
+            self._scheduler.start()
+        else:
+            self._scheduler = None
+
     def _room_id_for_job(self, job_id: str) -> str | None:
         """Look up the Matrix room that owns a given job_id."""
         for context in self.state.jobcards.values():
@@ -171,6 +183,8 @@ class MatrixWorker:
         self._ai_executor.shutdown(wait=False)
         if self._watchdog is not None:
             self._watchdog.stop()
+        if self._scheduler is not None:
+            self._scheduler.stop()
 
     # ── Room map (projects.json → room_id → project_name) ────────────────────
 
@@ -329,6 +343,12 @@ class MatrixWorker:
                 self._handle_help(event)
             elif lower in ("!todo", "!todos") or lower.startswith(("!todo ", "!todos ")):
                 self._handle_todo(event)
+            elif lower.startswith("!schedule "):
+                self._handle_schedule(event)
+            elif lower in ("!schedules", "!schedule") or lower.startswith("!schedules "):
+                self._handle_schedules(event)
+            elif lower.startswith("!unschedule "):
+                self._handle_unschedule(event)
             elif self._is_ai_message(event):
                 self._handle_ai_message(event)
             elif lower.startswith("devagent_jobcard "):
@@ -540,6 +560,9 @@ class MatrixWorker:
                 "`!cancel` — Laufenden Task abbrechen\n"
                 "`!todo` — Offene TODOs aller Projekte\n"
                 "`!todo @<projekt>` — TODOs eines Projekts anzeigen\n"
+                "`!schedule \"<ausdruck>\" <aufgabe>` — Geplanten Task anlegen\n"
+                "`!schedules` — Geplante Tasks anzeigen\n"
+                "`!unschedule <id>` — Geplanten Task entfernen\n"
                 "`!help` — Diese Hilfe"
             ),
         )
@@ -627,6 +650,150 @@ class MatrixWorker:
         except Exception:
             log.exception("failed to build project todo summary")
             self.client.send_notice(room_id=room_id, body="⚠️ Fehler beim Lesen der Projekt-TODOs.")
+
+    # ── Scheduler handlers ────────────────────────────────────────────────────
+
+    def _handle_schedule(self, event: dict[str, Any]) -> None:
+        """Handle !schedule "expr" task."""
+        room_id = str(event.get("room_id", self.config.room_id))
+        sender  = str(event.get("sender", ""))
+
+        if self._scheduler is None:
+            self.client.send_notice(
+                room_id=room_id,
+                body="⚠️ Scheduler nicht konfiguriert. Bitte DEVAGENT_SCHEDULES_FILE in .env setzen.",
+            )
+            return
+
+        body = str((event.get("content") or {}).get("body", "")).strip()
+        # Expect: !schedule "expr" task text
+        import re as _re
+        m = _re.match(r'!schedules?\s+"([^"]+)"\s+(.*)', body, _re.IGNORECASE | _re.DOTALL)
+        if not m:
+            self.client.send_notice(
+                room_id=room_id,
+                body=(
+                    '❌ Ungültiges Format. Beispiel:\n'
+                    '`!schedule "täglich 09:00" Führe Code-Review durch`'
+                ),
+            )
+            return
+
+        expr, task = m.group(1).strip(), m.group(2).strip()
+        if not task:
+            self.client.send_notice(room_id=room_id, body="❌ Aufgabe darf nicht leer sein.")
+            return
+
+        if parse_schedule_expr(expr) is None:
+            self.client.send_notice(
+                room_id=room_id,
+                body=(
+                    f'❌ Ungültiger Zeitausdruck: `{expr}`\n'
+                    "Gültig: `täglich HH:MM`, `montags HH:MM`, `stündlich`, `0 9 * * *`"
+                ),
+            )
+            return
+
+        result = self._scheduler.add(room_id=room_id, expr=expr, task=task, created_by=sender)
+        if result is None:
+            self.client.send_notice(room_id=room_id, body="❌ Fehler beim Anlegen des Schedules.")
+            return
+
+        sched_id, parsed = result
+        self.client.send_notice(
+            room_id=room_id,
+            body=f"✅ Schedule `{sched_id}` angelegt: [{parsed.human_readable()}] {task[:80]}",
+        )
+
+    def _handle_schedules(self, event: dict[str, Any]) -> None:
+        """Handle !schedules — list scheduled tasks for this room."""
+        room_id = str(event.get("room_id", self.config.room_id))
+
+        if self._scheduler is None:
+            self.client.send_notice(
+                room_id=room_id,
+                body="⚠️ Scheduler nicht konfiguriert (DEVAGENT_SCHEDULES_FILE fehlt).",
+            )
+            return
+
+        entries = self._scheduler.list_for_room(room_id)
+        if not entries:
+            self.client.send_notice(room_id=room_id, body="📅 Keine Schedules für diesen Raum.")
+            return
+
+        lines = ["**Geplante Tasks** (ID — Ausdruck — Aufgabe)"]
+        for e in entries:
+            last = e.get("last_fired") or "nie"
+            lines.append(f"`{e['id']}` [{e['expr']}] {e['task'][:60]}  _(zuletzt: {last})_")
+        self.client.send_notice(room_id=room_id, body="\n".join(lines))
+
+    def _handle_unschedule(self, event: dict[str, Any]) -> None:
+        """Handle !unschedule <id>."""
+        room_id = str(event.get("room_id", self.config.room_id))
+
+        if self._scheduler is None:
+            self.client.send_notice(
+                room_id=room_id,
+                body="⚠️ Scheduler nicht konfiguriert (DEVAGENT_SCHEDULES_FILE fehlt).",
+            )
+            return
+
+        body = str((event.get("content") or {}).get("body", "")).strip()
+        parts = body.split(None, 1)
+        if len(parts) < 2 or not parts[1].strip():
+            self.client.send_notice(room_id=room_id, body="❌ Verwendung: `!unschedule <id>`")
+            return
+
+        sched_id = parts[1].strip()
+        if self._scheduler.remove(sched_id):
+            self.client.send_notice(room_id=room_id, body=f"🗑️ Schedule `{sched_id}` entfernt.")
+        else:
+            self.client.send_notice(
+                room_id=room_id,
+                body=f"❌ Schedule `{sched_id}` nicht gefunden. `!schedules` zum Anzeigen.",
+            )
+
+    def _run_scheduled_task(self, sched_id: str, room_id: str, task: str) -> None:
+        """Called by ScheduledTaskRunner to fire a task (runs in scheduler thread)."""
+        proj = self._project_for_room(room_id)
+        if proj and proj.get("local_path") and Path(proj["local_path"]).is_dir():
+            cwd = proj["local_path"]
+            context_hint = proj["name"]
+        elif Path(self.config.repos_root).is_dir():
+            cwd = self.config.repos_root
+            context_hint = "kein Repo-Kontext"
+        else:
+            cwd = str(Path.home())
+            context_hint = "kein Repo-Kontext"
+
+        with self._room_locks_mutex:
+            if room_id not in self._room_locks:
+                self._room_locks[room_id] = threading.Lock()
+            room_lock = self._room_locks[room_id]
+
+        if not room_lock.acquire(blocking=False):
+            self.client.send_notice(
+                room_id=room_id,
+                body=f"⏳ Schedule `{sched_id}` übersprungen — Raum ist beschäftigt.",
+            )
+            return
+
+        cancel_event = threading.Event()
+        self._room_cancel[room_id] = cancel_event
+        self._room_task_start[room_id] = time.time()
+
+        self.client.send_notice(
+            room_id=room_id,
+            body=f"🕐 Schedule `{sched_id}` gestartet [{context_hint}]: {task[:80]}",
+        )
+
+        self._ai_executor.submit(
+            self._run_ai_task_async,
+            task, cwd, f"schedule:{sched_id}", room_id, "scheduler",
+            None,          # no conversation history
+            room_lock,
+            cancel_event,
+        )
 
     # ── Output splitting ──────────────────────────────────────────────────────
 
@@ -827,6 +994,7 @@ def load_config_from_env() -> MatrixWorkerConfig:
         relogin_password=os.getenv("MATRIX_PASSWORD_DEVAGENT", ""),
         relogin_env_file=os.getenv("DEVAGENT_ENV_FILE", "/srv/devagent/.env"),
         todo_file=os.getenv("DEVAGENT_TODO_FILE", ""),
+        schedules_file=os.getenv("DEVAGENT_SCHEDULES_FILE", ""),
     )
 
 

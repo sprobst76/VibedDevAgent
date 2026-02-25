@@ -219,10 +219,14 @@ touch docs/event-push.md
 - [x] Jeder Backend liefert `/api/health` + `/api/projects` + `/api/jobs`
 - [x] Aggregierte Ansicht aller Backends in einem Frontend
 
-### 21) Scheduled Tasks
-- [ ] `!schedule "täglich 09:00" <aufgabe>` — Cron-ähnliche Tasks pro Raum
-- [ ] Gespeichert in SQLite oder JSON
-- [ ] Inspiriert von NanoClaw task-scheduler.ts
+### 21) Scheduled Tasks ✓
+- [x] `!schedule "täglich 09:00" <aufgabe>` — Cron-ähnliche Tasks pro Raum
+- [x] Gespeichert in JSON (`DEVAGENT_SCHEDULES_FILE`), atomic writes
+- [x] `!schedules` — Liste aller Schedules im Raum
+- [x] `!unschedule <id>` — Schedule entfernen
+- [x] Ausdrücke: `täglich HH:MM`, `stündlich`, `montags HH:MM`, `0 9 * * *`
+- [x] Daemon-Thread (`ScheduledTaskRunner`), prüft alle 30s, no double-fire
+- [x] 33 Tests in `tests/test_scheduler.py`
 
 ### 22) PTY-Modus für Claude Code
 - [ ] `subprocess.Popen` mit `pty.openpty()` für bessere Kompatibilität

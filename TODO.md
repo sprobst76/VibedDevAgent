@@ -254,6 +254,13 @@ touch docs/event-push.md
 - [x] `.claude/settings.local.json` in `.gitignore` eingetragen
 - [x] Explizite `git add*`/`commit*`/`push*`-Einträge in `settings.json` (kein Permission-Prompt)
 
+### 25) Proaktive TODO-Vorschläge nach Job-Abschluss ✓
+- [x] `next_open_todo(sections)` in `todo_parser.py` — erstes offenes Item nach Priorität
+- [x] `_suggest_next_todo(room_id)` in `matrix_worker.py` — nach erfolgreichem Job
+- [x] Opt-in via `DEVAGENT_PROACTIVE_TODOS=1` (default: 0)
+- [x] Nur wenn Raum ein Projekt mit `TODO.md` hat und offene Items existieren
+- [x] 12 neue Tests (6 `NextOpenTodoTests` + 6 `SuggestNextTodoTests`, 428 gesamt)
+
 ## P4 — Zurückgestellt / Nice-to-have
 
 ### 20) Kein `!ai`-Prefix in Projekt-Räumen (opt-in)

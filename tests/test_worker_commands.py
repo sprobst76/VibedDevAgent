@@ -507,5 +507,89 @@ class HandleTodoCommandTests(unittest.TestCase):
         self.assertGreater(len(self.client.notices), 0)
 
 
+_SAMPLE_TODO_FOR_SUGGEST = textwrap.dedent("""\
+    ## P0 -- Zwingend
+    - [ ] Erste offene Aufgabe
+    - [x] Erledigte Aufgabe
+    ## P1 -- Nice to have
+    - [ ] P1 Aufgabe
+""")
+
+
+class SuggestNextTodoTests(unittest.TestCase):
+    """Tests for _suggest_next_todo and proactive_todos config."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp()
+        self.room = "!room:matrix.org"
+
+    def _make_worker_with_proactive(self, proactive: bool) -> tuple[MatrixWorker, FakeMatrixClient]:
+        from dataclasses import replace
+        worker, client = _make_worker(self.tmp, room_id=self.room)
+        worker.config = replace(worker.config, proactive_todos=proactive)
+        return worker, client
+
+    def _register_project(self, worker: MatrixWorker, todo_content: str | None = None) -> str:
+        proj_dir = Path(self.tmp) / "MyProject"
+        proj_dir.mkdir(exist_ok=True)
+        if todo_content is not None:
+            (proj_dir / "TODO.md").write_text(todo_content, encoding="utf-8")
+        projects_path = Path(self.tmp) / "projects.json"
+        projects_path.write_text(json.dumps({"projects": {
+            "MyProject": {
+                "local_path": str(proj_dir),
+                "matrix_room_id": self.room,
+                "active": True,
+            }
+        }}), encoding="utf-8")
+        from dataclasses import replace
+        worker.config = replace(worker.config, projects_file=str(projects_path))
+        worker._refresh_room_map()
+        return str(proj_dir)
+
+    def test_no_suggestion_when_disabled(self):
+        worker, client = self._make_worker_with_proactive(False)
+        self._register_project(worker, _SAMPLE_TODO_FOR_SUGGEST)
+        worker._suggest_next_todo(self.room)
+        self.assertEqual(len(client.notices), 0)
+
+    def test_suggestion_sent_when_enabled_with_open_todos(self):
+        worker, client = self._make_worker_with_proactive(True)
+        self._register_project(worker, _SAMPLE_TODO_FOR_SUGGEST)
+        worker._suggest_next_todo(self.room)
+        self.assertEqual(len(client.notices), 1)
+        body = client.notices[0][1]
+        self.assertIn("P0", body)
+        self.assertIn("Erste offene Aufgabe", body)
+        self.assertIn("MyProject", body)
+
+    def test_no_suggestion_when_all_done(self):
+        worker, client = self._make_worker_with_proactive(True)
+        self._register_project(worker, "## P0 -- Done\n- [x] Fertig\n")
+        worker._suggest_next_todo(self.room)
+        self.assertEqual(len(client.notices), 0)
+
+    def test_no_suggestion_without_todo_md(self):
+        worker, client = self._make_worker_with_proactive(True)
+        self._register_project(worker, todo_content=None)  # no TODO.md
+        worker._suggest_next_todo(self.room)
+        self.assertEqual(len(client.notices), 0)
+
+    def test_no_suggestion_for_unknown_room(self):
+        worker, client = self._make_worker_with_proactive(True)
+        # no project registered → room not in room_map
+        worker._suggest_next_todo("!unknown:matrix.org")
+        self.assertEqual(len(client.notices), 0)
+
+    def test_suggestion_picks_highest_priority(self):
+        worker, client = self._make_worker_with_proactive(True)
+        self._register_project(worker, _SAMPLE_TODO_FOR_SUGGEST)
+        worker._suggest_next_todo(self.room)
+        body = client.notices[0][1]
+        # P0 should be suggested, not P1
+        self.assertIn("P0", body)
+        self.assertNotIn("P1 Aufgabe", body)
+
+
 if __name__ == "__main__":
     unittest.main()

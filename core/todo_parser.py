@@ -100,6 +100,24 @@ def format_for_matrix(sections: list[TodoSection]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def next_open_todo(sections: list[TodoSection]) -> tuple[str, str] | None:
+    """Return *(priority, item_text)* for the first open item in the highest-priority
+    section, or *None* if everything is done.
+
+    Sections are ordered by their numeric priority value so P0 < P1 < P2 etc.
+    The suffix (e.g. "-SECURITY") is used as a secondary sort key so that
+    "P1" and "P1-SECURITY" are kept stable relative to each other.
+    """
+    def _key(s: TodoSection) -> tuple[int, str]:
+        m = re.match(r"P(\d+)", s.priority)
+        return (int(m.group(1)) if m else 99, s.priority)
+
+    for section in sorted(sections, key=_key):
+        if section.open_items:
+            return section.priority, section.open_items[0]
+    return None
+
+
 def get_project_todos(projects: dict) -> dict[str, list[TodoSection]]:
     """Read TODO.md for each project and return name → sections mapping.
 

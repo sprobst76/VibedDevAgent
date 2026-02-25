@@ -12,6 +12,7 @@ from core.todo_parser import (
     format_project_detail,
     format_project_summary,
     get_project_todos,
+    next_open_todo,
     parse_todo_file,
 )
 
@@ -217,6 +218,55 @@ class FormatProjectDetailTests(unittest.TestCase):
         sections = [TodoSection(priority="P0", title="Done", open_items=[], done_count=2)]
         text = format_project_detail("MyProject", sections)
         self.assertIn("Alles erledigt", text)
+
+
+class NextOpenTodoTests(unittest.TestCase):
+
+    def _sec(self, priority: str, open_items: list[str], done: int = 0) -> TodoSection:
+        s = TodoSection(priority=priority, title="Test")
+        s.open_items = list(open_items)
+        s.done_count = done
+        return s
+
+    def test_returns_first_open_from_highest_priority(self):
+        sections = [
+            self._sec("P2", ["P2 task"]),
+            self._sec("P0", ["P0 first", "P0 second"]),
+            self._sec("P1", ["P1 task"]),
+        ]
+        result = next_open_todo(sections)
+        self.assertEqual(result, ("P0", "P0 first"))
+
+    def test_skips_fully_done_sections(self):
+        sections = [
+            self._sec("P0", [], done=3),       # all done
+            self._sec("P1", ["P1 task"]),
+        ]
+        result = next_open_todo(sections)
+        self.assertEqual(result, ("P1", "P1 task"))
+
+    def test_returns_none_when_all_done(self):
+        sections = [
+            self._sec("P0", [], done=2),
+            self._sec("P1", [], done=1),
+        ]
+        self.assertIsNone(next_open_todo(sections))
+
+    def test_returns_none_for_empty_sections(self):
+        self.assertIsNone(next_open_todo([]))
+
+    def test_p1_security_sorts_after_p1(self):
+        sections = [
+            self._sec("P1-SECURITY", ["sec task"]),
+            self._sec("P1", ["p1 task"]),
+        ]
+        result = next_open_todo(sections)
+        # P1 and P1-SECURITY share numeric value 1; stable sort puts "P1" before "P1-SECURITY"
+        self.assertEqual(result[0], "P1")
+
+    def test_single_section(self):
+        sections = [self._sec("P3", ["only task"])]
+        self.assertEqual(next_open_todo(sections), ("P3", "only task"))
 
 
 if __name__ == "__main__":

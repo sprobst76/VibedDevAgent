@@ -29,6 +29,7 @@ from core.todo_parser import format_for_matrix as _todo_format
 from core.todo_parser import format_project_detail as _todo_project_detail
 from core.todo_parser import format_project_summary as _todo_project_summary
 from core.todo_parser import get_project_todos as _get_project_todos
+from core.todo_parser import next_open_todo as _next_open_todo
 from core.todo_parser import parse_todo_file as _parse_todo
 from core.watchdog import JobWatchdog
 from core.worktree_manager import WorktreeManager
@@ -62,6 +63,7 @@ class MatrixWorkerConfig:
     todo_file: str = ""  # path to TODO.md; auto-detected if empty
     schedules_file: str = ""  # path to schedules.json; empty = scheduler disabled
     use_pty: bool = False     # attach subprocess to a PTY (better TTY compatibility)
+    proactive_todos: bool = False  # after successful job, suggest next open TODO
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -652,6 +654,36 @@ class MatrixWorker:
             log.exception("failed to build project todo summary")
             self.client.send_notice(room_id=room_id, body="⚠️ Fehler beim Lesen der Projekt-TODOs.")
 
+    # ── Proactive TODO suggestion ─────────────────────────────────────────────
+
+    def _suggest_next_todo(self, room_id: str) -> None:
+        """After a successful job, send the next open TODO as a suggestion.
+
+        Only active when config.proactive_todos is True and the room is
+        associated with a project that has an accessible TODO.md.
+        """
+        if not self.config.proactive_todos:
+            return
+        proj = self._project_for_room(room_id)
+        if not proj or not proj.get("local_path"):
+            return
+        sections = _parse_todo(Path(proj["local_path"]) / "TODO.md")
+        nxt = _next_open_todo(sections)
+        if nxt is None:
+            return
+        priority, item = nxt
+        name = proj.get("name", "")
+        short_item = item if len(item) <= 100 else item[:97] + "…"
+        self.client.send_notice(
+            room_id=room_id,
+            body=(
+                f"💡 Nächster offener TODO [{priority}] in **{name}**:\n"
+                f"{short_item}\n\n"
+                "Soll ich das angehen? → `!ai <aufgabe>` oder einfach ignorieren."
+            ),
+        )
+        log.debug("proactive todo suggestion sent to %s: [%s] %s", room_id, priority, item[:60])
+
     # ── Scheduler handlers ────────────────────────────────────────────────────
 
     def _handle_schedule(self, event: dict[str, Any]) -> None:
@@ -955,6 +987,11 @@ class MatrixWorker:
             except Exception:
                 log.exception("failed to send ai result to room %s", room_id)
             log.info("ai task done by %s [%s]: exit=%d, output_len=%d", sender, context_hint, result.exit_code, len(result.output))
+            if result.success:
+                try:
+                    self._suggest_next_todo(room_id)
+                except Exception:
+                    log.debug("proactive todo suggestion failed (non-fatal)", exc_info=True)
         finally:
             if room_lock is not None:
                 room_lock.release()
@@ -998,6 +1035,7 @@ def load_config_from_env() -> MatrixWorkerConfig:
         todo_file=os.getenv("DEVAGENT_TODO_FILE", ""),
         schedules_file=os.getenv("DEVAGENT_SCHEDULES_FILE", ""),
         use_pty=os.getenv("DEVAGENT_USE_PTY", "0") not in {"0", "false", "False", ""},
+        proactive_todos=os.getenv("DEVAGENT_PROACTIVE_TODOS", "0") not in {"0", "false", "False", ""},
     )
 
 

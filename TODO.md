@@ -1,6 +1,6 @@
 # TODO -- DevAgent MVP Roadmap (P0/P1/P2)
 
-Statusdatum: 2026-02-20
+Statusdatum: 2026-02-25
 Quelle: `DevAgent_Project_Specification.md`
 
 ## P0 -- MVP zwingend (erst fertigstellen)
@@ -138,21 +138,19 @@ touch docs/reliability.md
 
 ## P1-SECURITY -- Service-User Härtung (HOHE PRIORITÄT)
 
-### 14) Option C: devagent-User vollständig einrichten ⚠️ HOHE PRIO
-**Hintergrund:** Aktuell läuft der Service als der Operator-User (temporäre Lösung, Option A).
-Das ist für Entwicklung ok, aber nicht für produktiven Betrieb.
+### 14) Option C: devagent-User vollständig einrichten ✓
+**Umgesetzt Feb 2026** — Ansatz: ELF-Binary kopieren + POSIX-ACLs statt nvm/npm.
 
-- [ ] `devagent`-User mit Login-Shell ausstatten: `sudo usermod -s /bin/bash devagent`
-- [ ] Home-Dir für devagent einrichten (z.B. `/srv/devagent-home`) für `~/.claude/` Config
-- [ ] Node.js via nvm für `devagent` installieren
-- [ ] `claude` CLI für `devagent` installieren: `npm install -g @anthropic-ai/claude-code`
-- [ ] Claude-Auth für devagent einrichten: entweder OAuth (`claude auth login`) oder API Key in `.env`
-- [ ] Service-Unit zurück auf `User=devagent` stellen
-- [ ] Log-Verzeichnis `/var/log/devagent/` Ownership auf `devagent` korrigieren
-- [ ] Testen: `sudo -u devagent claude --version`
+- [x] Home-Dir `/srv/devagent/` + Ownership `devagent:devagent`
+- [x] `claude` CLI nach `/usr/local/bin/claude` kopiert (chmod 755)
+- [x] OAuth-Credentials nach `/srv/devagent/.claude/.credentials.json` (chmod 600)
+- [x] POSIX-ACL: `devagent` hat `rwX` auf `/home/spro/development/` (rekursiv + default)
+- [x] Service-Units auf `User=devagent` umgestellt
+- [x] Log-Verzeichnis `/var/log/devagent/` Ownership korrigiert
+- [x] Migration-Skript: `ops/systemd/setup_devagent_user.sh`
+- [x] 103 Tests: `test_service_files.py` + `test_system_deployment.py`
 
-**Warum wichtig:** Solange der Service als Operator-User läuft, hat ein bösartiger Job-Command
-Zugriff auf SSH-Keys, Browser-Profile und alle anderen Projekte des Users.
+**Hinweis:** Nach `claude update` das Setup-Skript erneut ausführen (Binary + Credentials sync).
 
 ### 15) Option E: Direkte Anthropic API (mittelfristige Alternative)
 **Hintergrund:** Statt `claude` CLI direkt die Python-API nutzen.
@@ -260,6 +258,13 @@ touch docs/event-push.md
 - [x] Opt-in via `DEVAGENT_PROACTIVE_TODOS=1` (default: 0)
 - [x] Nur wenn Raum ein Projekt mit `TODO.md` hat und offene Items existieren
 - [x] 12 neue Tests (6 `NextOpenTodoTests` + 6 `SuggestNextTodoTests`, 428 gesamt)
+
+### 26) Watchdog WAIT_APPROVAL Timeout ✓
+- [x] `JobRecord.wait_approval_at` — Timestamp wenn Job in WAIT_APPROVAL geht
+- [x] `DevAgentEngine.waiting_jobs()` — gibt alle WAIT_APPROVAL-Jobs zurück
+- [x] `JobWatchdog._check_waiting_job()` — auto-FAILED nach Timeout
+- [x] `DEVAGENT_MAX_WAIT_APPROVAL_SECONDS=3600` (default 1h, konfigurierbar)
+- [x] 10 neue Tests in `test_watchdog.py` (541 gesamt)
 
 ## P4 — Zurückgestellt / Nice-to-have
 

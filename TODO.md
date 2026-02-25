@@ -202,7 +202,9 @@ touch docs/event-push.md
 ### 16) Token Auto-Refresh
 - [x] Startup-Warning wenn `MATRIX_USER_DEVAGENT`/`MATRIX_PASSWORD_DEVAGENT` fehlen
 - [x] Auto-Relogin bei 401 bereits in `adapters/matrix/client.py` implementiert
-- [ ] Cronjob als zusätzliche Absicherung (`matrix_login.sh operator` täglich)
+- [x] Cronjob als zusätzliche Absicherung: `ops/cron/matrix_relogin.py` (täglich 03:00)
+- [x] Systemd-Timer: `ops/cron/devagent-relogin.{service,timer}.example`
+- [x] 19 Tests in `tests/test_matrix_relogin.py`
 
 ### 17) Lange Antworten aufteilen
 - [x] Splitting bei `\n\n`-Grenzen implementiert (`_split_for_matrix`, max 3800 Zeichen)

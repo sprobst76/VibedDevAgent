@@ -1,0 +1,13 @@
+[Unit]
+Description=DevAgent Matrix token renewal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Replace YOUR_USERNAME with the OS user running the devagent service.
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/development/VibedDevAgent
+ExecStart=/usr/bin/python3 ops/cron/matrix_relogin.py /srv/devagent/.env
+StandardOutput=append:/var/log/devagent/relogin.log
+StandardError=append:/var/log/devagent/relogin.log

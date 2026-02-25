@@ -1,0 +1,11 @@
+[Unit]
+Description=DevAgent Matrix token renewal (daily at 03:00)
+Requires=devagent-relogin.service
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

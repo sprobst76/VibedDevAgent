@@ -36,11 +36,15 @@ def detect_github_repo(local_path: str) -> tuple[str, str] | None:
 def fetch_workflow_runs(
     owner: str,
     repo: str,
-    token: str,
+    token: str = "",
     per_page: int = 10,
     timeout: float = 10.0,
 ) -> list[dict]:
     """Return the latest workflow runs for *owner*/*repo* from the GitHub API.
+
+    *token* is optional. Without a token the GitHub API works for public repos
+    but is rate-limited to 60 requests/hour. With a token (PAT with
+    ``read:actions``), the limit is 5000 requests/hour.
 
     Returns an empty list on any error (network, auth, rate-limit, …).
     """
@@ -48,15 +52,14 @@ def fetch_workflow_runs(
         f"https://api.github.com/repos/{owner}/{repo}/actions/runs"
         f"?per_page={per_page}"
     )
-    req = request.Request(
-        url,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "devagent/0.1",
-        },
-    )
+    headers: dict[str, str] = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "devagent/0.1",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = request.Request(url, headers=headers)
     try:
         with request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
             data = json.loads(resp.read().decode("utf-8"))

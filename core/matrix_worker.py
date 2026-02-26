@@ -178,8 +178,8 @@ class MatrixWorker:
         else:
             self._scheduler = None
 
-        # GitHub Actions CI monitor
-        if config.github_token:
+        # GitHub Actions CI monitor (token optional — works for public repos without one)
+        if True:
             from core.ci_monitor import CIMonitor
             self._ci_monitor: CIMonitor | None = CIMonitor(
                 github_token=config.github_token,
@@ -836,7 +836,7 @@ class MatrixWorker:
         if self._ci_monitor is None:
             self.client.send_notice(
                 room_id=room_id,
-                body="⚠️ GITHUB_TOKEN nicht konfiguriert — CI Monitor ist deaktiviert.",
+                body="⚠️ CI Monitor nicht verfügbar.",
             )
             return
 

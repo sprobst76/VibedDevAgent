@@ -857,9 +857,16 @@ class MatrixWorker:
                     return
                 status_list = self._ci_monitor.fetch_status_for_projects({proj_name: proj})
             else:
-                status_list = self._ci_monitor.fetch_status_for_projects(
-                    self._read_projects_dict()
-                )
+                # Default: show only the project that belongs to this room.
+                # Falls back to all projects if the room is not linked to any project.
+                proj_name = self._room_map.get(room_id)
+                if proj_name:
+                    projects = self._read_projects_dict()
+                    proj = projects.get(proj_name)
+                    target = {proj_name: proj} if proj else {}
+                else:
+                    target = self._read_projects_dict()
+                status_list = self._ci_monitor.fetch_status_for_projects(target)
 
             from core.ci_monitor import format_ghstatus
             text = format_ghstatus(status_list)

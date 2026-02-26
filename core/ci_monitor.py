@@ -61,10 +61,14 @@ class CIMonitor:
         self._thread = threading.Thread(
             target=self._loop, daemon=True, name="ci-monitor"
         )
+        # Startup scan: delay lets the Matrix worker do its first sync and
+        # populate the room_map before we try to send notifications.
+        self._startup_delay = 60  # seconds
 
     def start(self) -> None:
         self._thread.start()
-        log.info("CI monitor started (interval=%ds)", self._interval)
+        log.info("CI monitor started (interval=%ds, startup_scan in %ds)",
+                 self._interval, self._startup_delay)
 
     def stop(self) -> None:
         self._stop.set()
@@ -72,11 +76,60 @@ class CIMonitor:
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _loop(self) -> None:
+        # One-time startup scan: fire cards for projects that are *already* failing.
+        if not self._stop.wait(self._startup_delay):
+            try:
+                self._startup_scan()
+            except Exception:
+                log.exception("CI monitor startup_scan failed")
+
         while not self._stop.wait(self._interval):
             try:
                 self._check_once()
             except Exception:
                 log.exception("CI monitor _check_once failed")
+
+    def _startup_scan(self) -> None:
+        """Check all projects once on startup and fire failure cards immediately.
+
+        Unlike _check_once(), this fires on *current* failures regardless of
+        previous state — useful after a service restart when _prev is empty.
+        After running, _prev is populated so regular polling won't re-fire.
+        """
+        log.info("CI monitor: running startup scan")
+        for proj_name, proj in self._read_projects().items():
+            local_path = proj.get("local_path", "")
+            if not local_path:
+                continue
+            repo_info = self._resolve_repo(local_path)
+            if not repo_info:
+                continue
+            owner, repo_name = repo_info
+            try:
+                runs = fetch_workflow_runs(owner, repo_name, self._token)
+            except Exception:
+                log.debug("CI startup fetch failed for %s/%s", owner, repo_name)
+                continue
+            if not runs:
+                continue
+
+            by_wf = latest_per_workflow(runs)
+            conclusion = overall_conclusion(by_wf)
+            key = f"{owner}/{repo_name}"
+            self._prev[key] = conclusion  # set baseline for future polling
+
+            if conclusion == "failure":
+                room_id = self._room_id_for(proj_name)
+                if room_id:
+                    try:
+                        if self._on_failure is not None:
+                            self._on_failure(room_id, proj_name, local_path, by_wf)
+                        else:
+                            msg = _format_change_notice(proj_name, owner, repo_name, by_wf, conclusion)
+                            self._notify(room_id, msg)
+                        log.info("CI startup: failure card sent for %s", proj_name)
+                    except Exception:
+                        log.exception("CI startup: notify failed for %s", proj_name)
 
     def _read_projects(self) -> dict:
         try:

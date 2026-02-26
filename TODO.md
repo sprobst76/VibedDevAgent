@@ -1,6 +1,6 @@
 # TODO -- DevAgent MVP Roadmap (P0/P1/P2)
 
-Statusdatum: 2026-02-25
+Statusdatum: 2026-02-26
 Quelle: `DevAgent_Project_Specification.md`
 
 ## P0 -- MVP zwingend (erst fertigstellen)
@@ -258,6 +258,12 @@ touch docs/event-push.md
 - [x] Opt-in via `DEVAGENT_PROACTIVE_TODOS=1` (default: 0)
 - [x] Nur wenn Raum ein Projekt mit `TODO.md` hat und offene Items existieren
 - [x] 12 neue Tests (6 `NextOpenTodoTests` + 6 `SuggestNextTodoTests`, 428 gesamt)
+
+### 27) SVG Favicon ✓
+- [x] `>_` Terminal-Prompt im Dracula-Look (cyan Chevron + lila Underscore)
+- [x] Direkt in `server.py` als Inline-SVG, keine Static-Files nötig
+- [x] `/favicon.ico` zu `_PUBLIC_PATHS` hinzugefügt (kein Auth erforderlich)
+- [x] `<link rel="icon">` in `base.html`
 
 ### 26) Watchdog WAIT_APPROVAL Timeout ✓
 - [x] `JobRecord.wait_approval_at` — Timestamp wenn Job in WAIT_APPROVAL geht

@@ -26,6 +26,13 @@ log = logging.getLogger("devagent.ci_monitor")
 class CIMonitor:
     """Periodically polls GitHub Actions for every registered project and
     posts a Matrix notice when the build status changes.
+
+    *on_failure_fn* is called when a project transitions to a failure state.
+    Signature: ``on_failure_fn(room_id, proj_name, local_path, by_workflow)``.
+    If not provided, *notify_fn* is used for failures too (plain text notice).
+
+    *notify_fn* is called for non-failure status changes (e.g. recovery ok←fail).
+    Signature: ``notify_fn(room_id, message)``.
     """
 
     def __init__(
@@ -35,12 +42,14 @@ class CIMonitor:
         projects_file: str,
         room_id_for_fn: Callable[[str], str | None],
         notify_fn: Callable[[str, str], None],
+        on_failure_fn: Callable[[str, str, str, dict], None] | None = None,
         check_interval: int = 300,
     ) -> None:
         self._token = github_token
         self._projects_file = projects_file
         self._room_id_for = room_id_for_fn
         self._notify = notify_fn
+        self._on_failure = on_failure_fn
         self._interval = check_interval
 
         # "owner/repo" → overall_conclusion from previous poll
@@ -108,9 +117,13 @@ class CIMonitor:
             if prev is not None and prev != conclusion:
                 room_id = self._room_id_for(proj_name)
                 if room_id:
-                    msg = _format_change_notice(proj_name, owner, repo_name, by_wf, conclusion)
                     try:
-                        self._notify(room_id, msg)
+                        if conclusion == "failure" and self._on_failure is not None:
+                            local_path = proj.get("local_path", "")
+                            self._on_failure(room_id, proj_name, local_path, by_wf)
+                        else:
+                            msg = _format_change_notice(proj_name, owner, repo_name, by_wf, conclusion)
+                            self._notify(room_id, msg)
                     except Exception:
                         log.exception("CI monitor: notify failed for %s", proj_name)
 
@@ -164,12 +177,39 @@ def _format_change_notice(
         num = run.get("run_number", "?")
         branch = run.get("head_branch", "?")
         lines.append(f"  {_icon(c)} {wf_name} · #{num} · {branch} · {c}")
-    if conclusion == "failure":
-        lines.append(
-            f"\nSoll ich die Fehler analysieren?\n"
-            f"→ !ai @{proj_name} Analysiere den fehlgeschlagenen GitHub Build und behebe die Fehler"
-        )
     return "\n".join(lines)
+
+
+def format_failure_notice(
+    proj_name: str,
+    owner: str,
+    repo_name: str,
+    by_wf: dict[str, dict],
+) -> str:
+    """Format the failure notice that is sent as the ✅-approvable card."""
+    lines = [f"❌ Build kaputt: {proj_name} ({owner}/{repo_name})"]
+    for wf_name, run in by_wf.items():
+        c = run_conclusion(run)
+        if c == "failure":
+            num = run.get("run_number", "?")
+            branch = run.get("head_branch", "?")
+            lines.append(f"  ❌ {wf_name} · #{num} · {branch}")
+    lines.append("\n→ Mit ✅ reagieren um Analyse und Fix zu starten")
+    return "\n".join(lines)
+
+
+def build_ci_fix_task(proj_name: str, by_wf: dict[str, dict]) -> str:
+    """Build the !ai task description for a CI failure fix."""
+    failed = [
+        f"- {wf} · #{run.get('run_number','?')} · {run.get('head_branch','?')}"
+        for wf, run in by_wf.items()
+        if run_conclusion(run) == "failure"
+    ]
+    wf_list = "\n".join(failed) if failed else "- (unbekannt)"
+    return (
+        f"Analysiere den fehlgeschlagenen GitHub Actions Build für {proj_name} "
+        f"und behebe die Fehler.\n\nFehlgeschlagene Workflows:\n{wf_list}"
+    )
 
 
 def format_ghstatus(status_list: list[dict]) -> str:

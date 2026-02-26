@@ -151,6 +151,8 @@ class MatrixWorker:
         self._room_cancel: dict[str, threading.Event] = {}
         # Per-room task start time for !status
         self._room_task_start: dict[str, float] = {}
+        # Pending CI fix cards: event_id → {room_id, proj_name, local_path, task}
+        self._pending_ci_fixes: dict[str, dict] = {}
         self._worker_start = time.time()
 
         # Background watchdog for orphaned/hung tmux jobs
@@ -186,6 +188,7 @@ class MatrixWorker:
                 projects_file=config.projects_file,
                 room_id_for_fn=self._room_id_for_project,
                 notify_fn=lambda room_id, msg: self.client.send_notice(room_id=room_id, body=msg),
+                on_failure_fn=self._on_ci_failure,
                 check_interval=config.ci_check_interval,
             )
             self._ci_monitor.start()
@@ -505,6 +508,14 @@ class MatrixWorker:
         room_id = str(event.get("room_id", self.config.room_id))
 
         if not target_event_id or not reaction or not sender:
+            return
+
+        # Check if this is a ✅ reaction on a pending CI failure card
+        ci_fix = self._pending_ci_fixes.get(target_event_id)
+        if ci_fix and reaction.replace("\ufe0f", "").strip() == "✅":
+            if sender in self.config.allowed_users:
+                del self._pending_ci_fixes[target_event_id]
+                self._trigger_ci_fix(ci_fix, sender)
             return
 
         context = self.state.jobcards.get(target_event_id)
@@ -878,6 +889,70 @@ class MatrixWorker:
                 room_id=room_id,
                 body="⚠️ Fehler beim Abrufen des CI-Status.",
             )
+
+    def _trigger_ci_fix(self, ci_fix: dict, sender: str) -> None:
+        """Start an AI fix job for a CI failure (called after ✅ reaction)."""
+        room_id = ci_fix["room_id"]
+        proj_name = ci_fix["proj_name"]
+        local_path = ci_fix["local_path"]
+        task = ci_fix["task"]
+
+        with self._room_locks_mutex:
+            if room_id not in self._room_locks:
+                self._room_locks[room_id] = threading.Lock()
+            room_lock = self._room_locks[room_id]
+
+        if not room_lock.acquire(blocking=False):
+            self.client.send_notice(
+                room_id=room_id,
+                body="⏳ Eine Aufgabe läuft bereits in diesem Raum. Bitte warten.",
+            )
+            return
+
+        cancel_event = threading.Event()
+        self._room_cancel[room_id] = cancel_event
+        self._room_task_start[room_id] = time.time()
+
+        self.client.send_notice(
+            room_id=room_id,
+            body=f"🔧 Analysiere Build-Fehler und arbeite an einem Fix [{proj_name}]…",
+        )
+        log.info("CI fix job started by %s for %s (cwd=%s)", sender, proj_name, local_path)
+
+        self._ai_executor.submit(
+            self._run_ai_task_async,
+            task, local_path, proj_name, room_id, sender,
+            None, room_lock, cancel_event,
+        )
+
+    def _on_ci_failure(
+        self, room_id: str, proj_name: str, local_path: str, by_wf: dict
+    ) -> None:
+        """Called by CIMonitor when a project transitions to failure.
+
+        Posts a failure card that the user can react to with ✅ to trigger
+        an automatic AI fix job.
+        """
+        from core.ci_monitor import format_failure_notice, build_ci_fix_task
+        # Extract owner from the head_repository field if available
+        first_run = next(iter(by_wf.values()), {}) if by_wf else {}
+        full_name = (first_run.get("head_repository") or {}).get("full_name", "")
+        owner = full_name.split("/")[0] if "/" in full_name else proj_name
+        msg = format_failure_notice(proj_name, owner=owner, repo_name=proj_name, by_wf=by_wf)
+        try:
+            resp = self.client.send_notice(room_id=room_id, body=msg)
+            event_id = resp.get("event_id", "")
+            if event_id and local_path:
+                task = build_ci_fix_task(proj_name, by_wf)
+                self._pending_ci_fixes[event_id] = {
+                    "room_id": room_id,
+                    "proj_name": proj_name,
+                    "local_path": local_path,
+                    "task": task,
+                }
+                log.debug("CI failure card posted for %s, event_id=%s", proj_name, event_id)
+        except Exception:
+            log.exception("_on_ci_failure: failed to post card for %s", proj_name)
 
     def _run_scheduled_task(self, sched_id: str, room_id: str, task: str) -> None:
         """Called by ScheduledTaskRunner to fire a task (runs in scheduler thread)."""

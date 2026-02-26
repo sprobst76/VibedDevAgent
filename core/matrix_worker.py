@@ -65,6 +65,8 @@ class MatrixWorkerConfig:
     schedules_file: str = ""  # path to schedules.json; empty = scheduler disabled
     use_pty: bool = False     # attach subprocess to a PTY (better TTY compatibility)
     proactive_todos: bool = False  # after successful job, suggest next open TODO
+    github_token: str = ""        # GitHub PAT for CI monitor; empty = disabled
+    ci_check_interval: int = 300  # seconds between CI polls (default: 5 min)
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -176,12 +178,44 @@ class MatrixWorker:
         else:
             self._scheduler = None
 
+        # GitHub Actions CI monitor
+        if config.github_token:
+            from core.ci_monitor import CIMonitor
+            self._ci_monitor: CIMonitor | None = CIMonitor(
+                github_token=config.github_token,
+                projects_file=config.projects_file,
+                room_id_for_fn=self._room_id_for_project,
+                notify_fn=lambda room_id, msg: self.client.send_notice(room_id=room_id, body=msg),
+                check_interval=config.ci_check_interval,
+            )
+            self._ci_monitor.start()
+        else:
+            self._ci_monitor = None
+
     def _room_id_for_job(self, job_id: str) -> str | None:
         """Look up the Matrix room that owns a given job_id."""
         for context in self.state.jobcards.values():
             if context.get("job_id") == job_id:
                 return context.get("room_id") or None
         return None
+
+    def _room_id_for_project(self, project_name: str) -> str | None:
+        """Look up the Matrix room for a given project name."""
+        # _room_map is {room_id: proj_name}; we need the inverse
+        return next(
+            (rid for rid, name in self._room_map.items() if name == project_name),
+            None,
+        )
+
+    def _read_projects_dict(self) -> dict:
+        """Read projects.json and return the projects dict (empty on error)."""
+        try:
+            path = Path(self.config.projects_file)
+            if path.exists():
+                return json.loads(path.read_text(encoding="utf-8")).get("projects", {})
+        except Exception:
+            log.exception("failed to read projects file %s", self.config.projects_file)
+        return {}
 
     def stop(self) -> None:
         self._running = False
@@ -190,6 +224,8 @@ class MatrixWorker:
             self._watchdog.stop()
         if self._scheduler is not None:
             self._scheduler.stop()
+        if self._ci_monitor is not None:
+            self._ci_monitor.stop()
 
     # ── Room map (projects.json → room_id → project_name) ────────────────────
 
@@ -354,6 +390,8 @@ class MatrixWorker:
                 self._handle_schedules(event)
             elif lower.startswith("!unschedule "):
                 self._handle_unschedule(event)
+            elif lower == "!ghstatus" or lower.startswith("!ghstatus "):
+                self._handle_ghstatus(event)
             elif self._is_ai_message(event):
                 self._handle_ai_message(event)
             elif lower.startswith("devagent_jobcard "):
@@ -791,6 +829,49 @@ class MatrixWorker:
                 body=f"❌ Schedule `{sched_id}` nicht gefunden. `!schedules` zum Anzeigen.",
             )
 
+    def _handle_ghstatus(self, event: dict[str, Any]) -> None:
+        """Handle !ghstatus [@ProjectName] — show GitHub Actions CI status."""
+        room_id = str(event.get("room_id", self.config.room_id))
+
+        if self._ci_monitor is None:
+            self.client.send_notice(
+                room_id=room_id,
+                body="⚠️ GITHUB_TOKEN nicht konfiguriert — CI Monitor ist deaktiviert.",
+            )
+            return
+
+        body = str((event.get("content") or {}).get("body", "")).strip()
+        parts = body.split(None, 1)
+        project_arg = parts[1].strip() if len(parts) > 1 else ""
+
+        try:
+            if project_arg.startswith("@"):
+                proj_name = project_arg[1:]
+                projects = self._read_projects_dict()
+                proj = projects.get(proj_name)
+                if proj is None:
+                    self.client.send_notice(
+                        room_id=room_id,
+                        body=f"❌ Projekt «{proj_name}» nicht gefunden.",
+                    )
+                    return
+                status_list = self._ci_monitor.fetch_status_for_projects({proj_name: proj})
+            else:
+                status_list = self._ci_monitor.fetch_status_for_projects(
+                    self._read_projects_dict()
+                )
+
+            from core.ci_monitor import format_ghstatus
+            text = format_ghstatus(status_list)
+            for chunk in self._split_for_matrix(text):
+                self.client.send_notice(room_id=room_id, body=chunk)
+        except Exception:
+            log.exception("_handle_ghstatus failed")
+            self.client.send_notice(
+                room_id=room_id,
+                body="⚠️ Fehler beim Abrufen des CI-Status.",
+            )
+
     def _run_scheduled_task(self, sched_id: str, room_id: str, task: str) -> None:
         """Called by ScheduledTaskRunner to fire a task (runs in scheduler thread)."""
         proj = self._project_for_room(room_id)
@@ -1042,6 +1123,8 @@ def load_config_from_env() -> MatrixWorkerConfig:
         use_pty=os.getenv("DEVAGENT_USE_PTY", "0") not in {"0", "false", "False", ""},
         proactive_todos=os.getenv("DEVAGENT_PROACTIVE_TODOS", "0") not in {"0", "false", "False", ""},
         max_wait_approval_seconds=int(os.getenv("DEVAGENT_MAX_WAIT_APPROVAL_SECONDS", "3600")),
+        github_token=os.getenv("GITHUB_TOKEN", ""),
+        ci_check_interval=int(os.getenv("DEVAGENT_CI_CHECK_INTERVAL", "300")),
     )
 
 

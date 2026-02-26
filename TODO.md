@@ -287,6 +287,15 @@ touch docs/event-push.md
 - [x] Bei Wiederherstellung: Banner weg, Polling-Trigger zurücksetzen, sofort-Poll
 - [x] Native `window.online/offline`-Events als schnelles zusätzliches Signal
 
+### 33) GitHub Actions CI Monitor ✓
+- [x] `adapters/github/client.py` — `detect_github_repo()` (git remote auto-detect), `fetch_workflow_runs()`, `latest_per_workflow()`, `run_conclusion()`, `overall_conclusion()`
+- [x] `core/ci_monitor.py` — `CIMonitor` Daemon-Thread (analog JobWatchdog), `fetch_status_for_projects()`, `format_ghstatus()`
+- [x] Matrix: `!ghstatus` — alle Projekte; `!ghstatus @ProjektName` — einzeln
+- [x] Background-Polling alle `DEVAGENT_CI_CHECK_INTERVAL=300`s, Notify nur bei Status-Änderung (fail↔ok)
+- [x] `GITHUB_TOKEN` env var; Monitor deaktiviert wenn leer
+- [x] Proaktiver Hinweis bei failure: `→ !ai @Projekt Analysiere den fehlgeschlagenen GitHub Build …`
+- [x] 22 neue Tests in `tests/test_github_client.py` (569 gesamt)
+
 ## P4 — Zurückgestellt / Nice-to-have
 
 ### 20) Kein `!ai`-Prefix in Projekt-Räumen (opt-in)

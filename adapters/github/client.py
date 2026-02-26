@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
-from urllib import error as urllib_error
+from pathlib import Path
 from urllib import request
 
 # Matches both HTTPS and SSH GitHub remote URLs.
@@ -12,22 +11,33 @@ _REMOTE_RE = re.compile(r"github\.com[:/]([^/\s]+)/([^/\s.]+?)(?:\.git)?\s*$")
 
 
 def detect_github_repo(local_path: str) -> tuple[str, str] | None:
-    """Run `git remote get-url origin` in *local_path* and parse owner/repo.
+    """Detect the GitHub owner/repo by reading ``.git/config`` directly.
 
-    Returns ``(owner, repo)`` or ``None`` if the remote is not on GitHub or the
-    command fails.
+    Avoids running a subprocess (which would fail with git's safe.directory
+    check when the repo is owned by a different OS user, e.g. spro vs devagent).
+
+    Returns ``(owner, repo)`` or ``None`` if the path is not a GitHub repo.
     """
     try:
-        result = subprocess.run(
-            ["git", "-C", local_path, "remote", "get-url", "origin"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            m = _REMOTE_RE.search(result.stdout.strip())
-            if m:
-                return m.group(1), m.group(2)
+        git_config = Path(local_path) / ".git" / "config"
+        if not git_config.exists():
+            return None
+        text = git_config.read_text(encoding="utf-8")
+        # Look for url = ... under [remote "origin"]
+        in_origin = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped == '[remote "origin"]':
+                in_origin = True
+                continue
+            if in_origin:
+                if stripped.startswith("["):
+                    break  # entered a different section
+                if stripped.startswith("url"):
+                    _, _, url = stripped.partition("=")
+                    m = _REMOTE_RE.search(url.strip())
+                    if m:
+                        return m.group(1), m.group(2)
     except Exception:  # noqa: BLE001
         pass
     return None

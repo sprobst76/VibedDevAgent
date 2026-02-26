@@ -1,8 +1,9 @@
 """Tests for adapters/github/client.py and core/ci_monitor.format_ghstatus."""
 from __future__ import annotations
 
+import tempfile
 import unittest
-from unittest.mock import patch, MagicMock
+from pathlib import Path
 
 from adapters.github.client import (
     detect_github_repo,
@@ -15,42 +16,45 @@ from core.ci_monitor import format_ghstatus
 
 # ── detect_github_repo ────────────────────────────────────────────────────────
 
+def _make_git_repo(tmp: str, url: str) -> str:
+    """Create a fake .git/config with the given remote origin url."""
+    git_dir = Path(tmp) / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        f'[core]\n\trepositoryformatversion = 0\n'
+        f'[remote "origin"]\n\turl = {url}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n',
+        encoding="utf-8",
+    )
+    return tmp
+
+
 class DetectGitHubRepoTests(unittest.TestCase):
-    def _run(self, stdout: str, returncode: int = 0):
-        mock_result = MagicMock()
-        mock_result.returncode = returncode
-        mock_result.stdout = stdout
-        with patch("adapters.github.client.subprocess.run", return_value=mock_result):
-            return detect_github_repo("/some/path")
+    def _detect(self, url: str) -> tuple[str, str] | None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _make_git_repo(tmp, url)
+            return detect_github_repo(path)
 
     def test_https_url_with_dot_git(self):
-        result = self._run("https://github.com/owner/my-repo.git\n")
-        self.assertEqual(result, ("owner", "my-repo"))
+        self.assertEqual(self._detect("https://github.com/owner/my-repo.git"), ("owner", "my-repo"))
 
     def test_https_url_without_dot_git(self):
-        result = self._run("https://github.com/owner/my-repo\n")
-        self.assertEqual(result, ("owner", "my-repo"))
+        self.assertEqual(self._detect("https://github.com/owner/my-repo"), ("owner", "my-repo"))
 
     def test_ssh_url(self):
-        result = self._run("git@github.com:owner/my-repo.git\n")
-        self.assertEqual(result, ("owner", "my-repo"))
+        self.assertEqual(self._detect("git@github.com:owner/my-repo.git"), ("owner", "my-repo"))
 
     def test_ssh_url_without_dot_git(self):
-        result = self._run("git@github.com:owner/my-repo\n")
-        self.assertEqual(result, ("owner", "my-repo"))
+        self.assertEqual(self._detect("git@github.com:owner/my-repo"), ("owner", "my-repo"))
 
     def test_non_github_remote_returns_none(self):
-        result = self._run("https://gitlab.com/owner/repo.git\n")
-        self.assertIsNone(result)
+        self.assertIsNone(self._detect("https://gitlab.com/owner/repo.git"))
 
-    def test_git_command_failure_returns_none(self):
-        result = self._run("", returncode=128)
-        self.assertIsNone(result)
+    def test_no_git_dir_returns_none(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(detect_github_repo(tmp))
 
-    def test_subprocess_exception_returns_none(self):
-        with patch("adapters.github.client.subprocess.run", side_effect=OSError("no git")):
-            result = detect_github_repo("/some/path")
-        self.assertIsNone(result)
+    def test_read_error_returns_none(self):
+        self.assertIsNone(detect_github_repo("/nonexistent/path/xyz"))
 
 
 # ── latest_per_workflow ───────────────────────────────────────────────────────

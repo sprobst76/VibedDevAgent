@@ -19,7 +19,7 @@ from typing import Annotated
 import socket
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -56,7 +56,7 @@ for _entry in os.getenv("DEVAGENT_BACKENDS", "").split(","):
 _UI_API_KEY      = os.getenv("DEVAGENT_UI_API_KEY", "")
 _AUTH_COOKIE     = "devagent_session"
 # Paths that bypass authentication
-_PUBLIC_PATHS    = {"/login", "/api/health"}
+_PUBLIC_PATHS    = {"/login", "/api/health", "/favicon.ico"}
 
 
 def _check_auth(request: Request) -> bool:
@@ -95,6 +95,21 @@ async def auth_middleware(request: Request, call_next):
 
 
 # ── Login / Logout routes ─────────────────────────────────────────────────────
+
+_FAVICON_SVG = """\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#282a36"/>
+  <path d="M5 9 L14 16 L5 23" stroke="#8be9fd" stroke-width="3.2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="17" y="20.5" width="10" height="2.8" rx="1.4" fill="#bd93f9"/>
+</svg>"""
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(content=_FAVICON_SVG, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, next: str = "/"):

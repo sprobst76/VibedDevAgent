@@ -74,5 +74,114 @@ class EngineAuditTests(unittest.TestCase):
             self.assertEqual(engine.get_job("00002").state, JobState.CANCELLED)
 
 
+class LoadFromArtifactsTests(unittest.TestCase):
+    """Tests for DevAgentEngine.load_from_artifacts()."""
+
+    def _write_audit(self, job_dir: Path, events: list[dict]) -> None:
+        job_dir.mkdir(parents=True, exist_ok=True)
+        audit = job_dir / "audit.jsonl"
+        with audit.open("w", encoding="utf-8") as fh:
+            for ev in events:
+                fh.write(json.dumps(ev) + "\n")
+
+    def test_restores_wait_approval_at_for_waiting_job(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_audit(
+                Path(tmp) / "job-w1",
+                [{"timestamp": "2026-02-20T10:00:00Z", "action": "receive", "state_after": "WAIT_APPROVAL",
+                  "state_before": "RECEIVED", "allowed": True, "reason": "", "job_id": "w1", "user_id": "u"}],
+            )
+            engine = DevAgentEngine(artifacts_root=tmp)
+            record = engine.create_job("w1")
+            record.state = JobState.WAIT_APPROVAL
+            # Simulate restart: wait_approval_at is 0.0
+            self.assertEqual(record.wait_approval_at, 0.0)
+
+            engine.load_from_artifacts()
+
+            self.assertGreater(record.wait_approval_at, 0.0)
+
+    def test_restores_started_at_for_running_job(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_audit(
+                Path(tmp) / "job-r1",
+                [
+                    {"timestamp": "2026-02-20T09:00:00Z", "action": "approve", "state_after": "RUNNING",
+                     "state_before": "WAIT_APPROVAL", "allowed": True, "reason": "", "job_id": "r1", "user_id": "u"},
+                    {"timestamp": "2026-02-20T09:00:01Z", "action": "runner_start", "state_after": "RUNNING",
+                     "state_before": "RUNNING", "allowed": True, "reason": "runner session started", "job_id": "r1",
+                     "user_id": "u"},
+                ],
+            )
+            engine = DevAgentEngine(artifacts_root=tmp)
+            record = engine.create_job("r1")
+            record.state = JobState.RUNNING
+            self.assertEqual(record.started_at, 0.0)
+
+            engine.load_from_artifacts()
+
+            self.assertGreater(record.started_at, 0.0)
+
+    def test_skips_terminal_jobs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_audit(
+                Path(tmp) / "job-d1",
+                [{"timestamp": "2026-02-20T10:00:00Z", "action": "done", "state_after": "DONE",
+                  "state_before": "RUNNING", "allowed": True, "reason": "", "job_id": "d1", "user_id": "u"}],
+            )
+            engine = DevAgentEngine(artifacts_root=tmp)
+            record = engine.create_job("d1")
+            record.state = JobState.DONE
+
+            engine.load_from_artifacts()
+
+            # No timestamps should be set (DONE is terminal)
+            self.assertEqual(record.started_at, 0.0)
+            self.assertEqual(record.wait_approval_at, 0.0)
+
+    def test_skips_missing_audit_file_gracefully(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = DevAgentEngine(artifacts_root=tmp)
+            record = engine.create_job("missing")
+            record.state = JobState.WAIT_APPROVAL
+
+            # Should not raise even if no audit.jsonl exists
+            engine.load_from_artifacts()
+            self.assertEqual(record.wait_approval_at, 0.0)
+
+    def test_does_not_overwrite_existing_timestamp(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_audit(
+                Path(tmp) / "job-x1",
+                [{"timestamp": "2026-02-20T10:00:00Z", "action": "receive", "state_after": "WAIT_APPROVAL",
+                  "state_before": "RECEIVED", "allowed": True, "reason": "", "job_id": "x1", "user_id": "u"}],
+            )
+            engine = DevAgentEngine(artifacts_root=tmp)
+            record = engine.create_job("x1")
+            record.state = JobState.WAIT_APPROVAL
+            existing_ts = 1_700_000_000.0
+            record.wait_approval_at = existing_ts  # already set
+
+            engine.load_from_artifacts()
+
+            # Should not be overwritten (was already set)
+            self.assertEqual(record.wait_approval_at, existing_ts)
+
+    def test_skips_jobs_not_in_engine(self) -> None:
+        """load_from_artifacts only processes jobs already in self.jobs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_audit(
+                Path(tmp) / "job-orphan",
+                [{"timestamp": "2026-02-20T10:00:00Z", "action": "receive", "state_after": "WAIT_APPROVAL",
+                  "state_before": "RECEIVED", "allowed": True, "reason": "", "job_id": "orphan", "user_id": "u"}],
+            )
+            engine = DevAgentEngine(artifacts_root=tmp)
+            # Do NOT create job "orphan" in engine
+
+            engine.load_from_artifacts()
+
+            self.assertNotIn("orphan", engine.jobs)
+
+
 if __name__ == "__main__":
     unittest.main()

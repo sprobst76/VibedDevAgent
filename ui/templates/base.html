@@ -97,9 +97,96 @@
     </div>
   </nav>
 
+  <!-- Offline banner (hidden by default) -->
+  <div id="offline-banner"
+       style="display:none; position:fixed; top:0; left:0; right:0; z-index:9999;
+              background:#ff5555; color:#f8f8f2; text-align:center;
+              padding:6px 12px; font-size:0.8rem; font-weight:600; letter-spacing:0.03em;">
+    ⚠ Verbindung zum Server unterbrochen — Verbindung wird wiederhergestellt …
+  </div>
+
   <main class="max-w-6xl mx-auto px-4 py-6">
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+  (function () {
+    'use strict';
+    var FAIL_THRESHOLD = 3;   // consecutive HTMX failures before showing banner
+    var HEALTH_INTERVAL = 10; // seconds between /api/health pings when offline
+    var _fails = 0;
+    var _offline = false;
+    var _healthTimer = null;
+    var banner = document.getElementById('offline-banner');
+
+    function _setOffline() {
+      if (_offline) return;
+      _offline = true;
+      banner.style.display = 'block';
+      // Push banner down by its own height so navbar isn't obscured
+      document.body.style.paddingTop = (banner.offsetHeight + 4) + 'px';
+      // Pause HTMX polling elements by switching their trigger to "never"
+      document.querySelectorAll('[hx-trigger*="every"]').forEach(function (el) {
+        el.setAttribute('data-saved-trigger', el.getAttribute('hx-trigger'));
+        htmx.trigger(el, 'htmx:abort');
+        el.setAttribute('hx-trigger', 'da-reconnect');  // custom event only
+        htmx.process(el);
+      });
+      _healthTimer = setInterval(_checkHealth, HEALTH_INTERVAL * 1000);
+    }
+
+    function _setOnline() {
+      if (!_offline) return;
+      _offline = false;
+      _fails = 0;
+      clearInterval(_healthTimer);
+      banner.style.display = 'none';
+      document.body.style.paddingTop = '';
+      // Restore HTMX polling and fire immediately
+      document.querySelectorAll('[hx-trigger="da-reconnect"]').forEach(function (el) {
+        var saved = el.getAttribute('data-saved-trigger') || 'every 30s';
+        el.setAttribute('hx-trigger', saved);
+        el.removeAttribute('data-saved-trigger');
+        htmx.process(el);
+        htmx.trigger(el, 'load');
+      });
+    }
+
+    function _checkHealth() {
+      fetch('/api/health', { method: 'GET', credentials: 'same-origin' })
+        .then(function (r) { if (r.ok) _setOnline(); })
+        .catch(function () {});
+    }
+
+    // Track HTMX request failures
+    document.body.addEventListener('htmx:sendError', function () {
+      _fails += 1;
+      if (_fails >= FAIL_THRESHOLD) _setOffline();
+    });
+    document.body.addEventListener('htmx:responseError', function (evt) {
+      // Only count server errors (5xx), not 4xx auth issues
+      var status = evt.detail && evt.detail.xhr && evt.detail.xhr.status;
+      if (status && status >= 500) {
+        _fails += 1;
+        if (_fails >= FAIL_THRESHOLD) _setOffline();
+      }
+    });
+    document.body.addEventListener('htmx:afterRequest', function (evt) {
+      var ok = evt.detail && evt.detail.successful;
+      if (ok && _fails > 0) {
+        _fails = 0;
+        if (_offline) _setOnline();
+      }
+    });
+
+    // Native browser online/offline events as fast signal
+    window.addEventListener('offline', _setOffline);
+    window.addEventListener('online', function () {
+      // Browser says online — verify with health check before restoring
+      _checkHealth();
+    });
+  })();
+  </script>
 
 </body>
 </html>

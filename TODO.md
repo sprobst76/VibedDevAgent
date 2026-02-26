@@ -272,6 +272,21 @@ touch docs/event-push.md
 - [x] `DEVAGENT_MAX_WAIT_APPROVAL_SECONDS=3600` (default 1h, konfigurierbar)
 - [x] 10 neue Tests in `test_watchdog.py` (541 gesamt)
 
+### 31) Job History Persistence ✓
+- [x] `DevAgentEngine.load_from_artifacts()` — liest `audit.jsonl` und restauriert `started_at` / `wait_approval_at`
+- [x] Nur aktive Jobs (RUNNING/WAIT_APPROVAL) werden gescannt (performant)
+- [x] Bereits gesetzte Timestamps werden nicht überschrieben (idempotent)
+- [x] Aufruf in `MatrixWorker._restore_engine_jobs()` nach State-File-Restore
+- [x] 6 neue Tests in `test_engine_audit.py` (547 gesamt)
+
+### 32) HTMX Offline Handling ✓
+- [x] Roter Offline-Banner (fixed, oben) — nur sichtbar wenn Verbindung weg
+- [x] JS zählt `htmx:sendError` + `htmx:responseError (5xx)` — Banner nach 3 Fehlern
+- [x] Polling-Elemente (`hx-trigger="every …"`) werden pausiert (`da-reconnect`-Trigger)
+- [x] Health-Check via `fetch('/api/health')` alle 10s wenn offline
+- [x] Bei Wiederherstellung: Banner weg, Polling-Trigger zurücksetzen, sofort-Poll
+- [x] Native `window.online/offline`-Events als schnelles zusätzliches Signal
+
 ## P4 — Zurückgestellt / Nice-to-have
 
 ### 20) Kein `!ai`-Prefix in Projekt-Räumen (opt-in)

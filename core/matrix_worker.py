@@ -380,6 +380,9 @@ class MatrixWorker:
                 record.state = JobState(state_raw)
             except ValueError:
                 record.state = JobState.WAIT_APPROVAL
+        # Fill in started_at / wait_approval_at from audit.jsonl files so
+        # the Watchdog can correctly apply timeouts after a service restart.
+        self.engine.load_from_artifacts()
 
     def _ensure_job_exists(self, job_id: str) -> None:
         if job_id in self.engine.jobs:

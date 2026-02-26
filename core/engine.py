@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 
 from adapters.matrix.reactions import ReactionDecision, evaluate_reaction
 from core.audit import append_audit_event
@@ -44,6 +47,59 @@ class DevAgentEngine:
     def waiting_jobs(self) -> list[JobRecord]:
         """Return all jobs currently in WAIT_APPROVAL state."""
         return [j for j in self.jobs.values() if j.state == JobState.WAIT_APPROVAL]
+
+    def load_from_artifacts(self) -> None:
+        """Restore missing timestamps from audit.jsonl files after a service restart.
+
+        Only processes jobs already in self.jobs whose state is RUNNING or WAIT_APPROVAL
+        and whose started_at / wait_approval_at are still at the default 0.0.
+        This is safe to call multiple times (idempotent for already-set timestamps).
+        """
+        for job_id, record in list(self.jobs.items()):
+            needs_started = record.started_at == 0.0 and record.state == JobState.RUNNING
+            needs_wait = record.wait_approval_at == 0.0 and record.state == JobState.WAIT_APPROVAL
+            if not needs_started and not needs_wait:
+                continue
+
+            audit_file = Path(self.artifacts_root) / f"job-{job_id}" / "audit.jsonl"
+            if not audit_file.exists():
+                continue
+
+            try:
+                lines = audit_file.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                continue
+
+            for line in lines:
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except Exception:
+                    continue
+
+                ts_str = event.get("timestamp", "")
+                action = event.get("action", "")
+                state_after = event.get("state_after", "")
+
+                if needs_wait and state_after == JobState.WAIT_APPROVAL.value:
+                    try:
+                        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        record.wait_approval_at = dt.timestamp()
+                    except Exception:
+                        pass
+
+                if needs_started and action == "runner_start" and event.get("allowed"):
+                    try:
+                        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        record.started_at = dt.timestamp()
+                    except Exception:
+                        pass
+
+            log.debug(
+                "job %s: restored started_at=%.0f wait_approval_at=%.0f from audit",
+                job_id, record.started_at, record.wait_approval_at,
+            )
 
     def fail_job(self, job_id: str) -> None:
         """Force-transition a job to FAILED (watchdog path, bypasses state machine)."""
